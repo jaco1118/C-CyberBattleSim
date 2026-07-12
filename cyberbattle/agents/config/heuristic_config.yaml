@@ -7,6 +7,9 @@ switch_interval: 5 # in episodes across the testing topologies
 isolation_filter_threshold: 0.01
 
 
+# Dynamic environment: override the trained model's dynamic_mode at test time (e.g. trained static / tested dynamic)
+dynamic_mode: leave # none | leave | join | both
+
 # defender
 static_defender_eviction_goal: True # if True, defender will try to evict all the nodes owned from the network
 random_event_probability: 0.01 # RandomEventsDefender

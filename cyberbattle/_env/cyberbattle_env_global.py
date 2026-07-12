@@ -62,10 +62,12 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
 
     def __init__(self,
                  pca_components = 768, # used to determine the feature vector size of each node
+                 penalty_invalid_movement = -50, # penalty for an action referencing a node dynamically removed since construction
                  **kwargs
                  ):
         super().__init__(**kwargs)
         self.env_type = "global"
+        self.penalty_invalid_movement = penalty_invalid_movement
         # build global discrete action space with all possible actions
         self.vulnerability_list = self.get_vulnerabilities_list()
         self.num_vulnerabilities = len(self.vulnerability_list)
@@ -85,8 +87,15 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
         self.vulnerability_embeddings_dimensions = pca_components
         self.node_feature_vector_size = self.get_node_feature_vector(self.starter_node) # just to initialize the feature vector
 
+        # padded_num_nodes sizes the observation space; defaults to this instance's own node count
+        # and is only overridden by pad_to_uniform_size() when this env is one of a batch of
+        # differently-sized topologies sharing one RandomSwitchEnv (see that method's docstring).
+        # Deliberately kept separate from self.num_nodes, which anchors the dynamic-leave
+        # floor/ramp calibration to this instance's real topology size and must not change.
+        self.padded_num_nodes = self.num_nodes
+
         # Create the observation space proportional to the number of nodes and the size of the node feature vector (graph size specific)
-        self.observation_space = spaces.Dict({"graph": spaces.Box(low=-100, high=100, shape=(self.num_nodes * len(self.node_feature_vector_size),), dtype=np.float64)})
+        self.observation_space = spaces.Dict({"graph": spaces.Box(low=-100, high=100, shape=(self.padded_num_nodes * len(self.node_feature_vector_size),), dtype=np.float64)})
         if self.verbose > 1:
             self.logger.info("Observation space: " + str(self.observation_space))
 
@@ -111,11 +120,36 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
                 self.nodes_dict[node] = len(self.nodes_dict)
         return self.nodes_dict
 
+    # Pads this env's action/observation space to a uniform size shared across a batch of
+    # differently-sized topology instances. RandomSwitchEnv fixes its action_space/observation_space
+    # once, from whichever topology instance loads first, and never revisits them when switching to
+    # a different instance mid-training -- for CyberBattleGlobalEnv specifically this crashes,
+    # because its action space directly encodes node identity (size is proportional to that
+    # topology's own node count x vulnerability catalogue) and its observation space is proportional
+    # to that topology's own node count, so a policy sized against a larger topology can sample an
+    # index out of range for a smaller one. Called once per env, over the full topology set, before
+    # any of them are wrapped in a RandomSwitchEnv, so every instance in the pool ends up with an
+    # identical, correct action_space/observation_space.
+    def pad_to_uniform_size(self, target_num_nodes, target_action_space_size):
+        if target_action_space_size > len(self.flattened_action_space):
+            self.flattened_action_space.extend(
+                [(None, None, None, None)] * (target_action_space_size - len(self.flattened_action_space))
+            )
+            self.action_space = spaces.Discrete(target_action_space_size)
+            if self.verbose > 1:
+                self.logger.info("Padded action space to %d entries (was %d)", target_action_space_size, len(self.flattened_action_space))
+        # padding entries are (None, None, None, None) tuples; calculate_discrete_action() unpacks
+        # them unchanged, and step()'s existing invalid-action guard already treats
+        # `source_node not in self.environment.nodes` (True for None) as a stale/invalid reference,
+        # so no change is needed there.
+        self.padded_num_nodes = target_num_nodes
+        self.observation_space = spaces.Dict({"graph": spaces.Box(low=-100, high=100, shape=(target_num_nodes * len(self.node_feature_vector_size),), dtype=np.float64)})
+
     # Reset function calling the base environment reset and determining initial observation vector
     def reset(self, **kwargs):
         super().reset_env()
         self.reset_evolving_visible_graph()
-        self.observation = [0 for _ in range(self.num_nodes * len(self.node_feature_vector_size))]
+        self.observation = [0 for _ in range(self.padded_num_nodes * len(self.node_feature_vector_size))]
         for index, node in enumerate(self.evolving_visible_graph.nodes):
             x = self.evolving_visible_graph.nodes[node]['x']
             self.observation[index * len(x): (index + 1) * len(x)] = x
@@ -134,6 +168,18 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
         self.evolving_visible_graph = nx.DiGraph()
         self.evolving_visible_graph.clear()
         self.add_node_evolving_visible_graph(self.starter_node) # initial node
+
+    # Dynamically remove a node (called by the base class's dynamic-leave mechanism). Only purges
+    # the evolving visible graph; unlike Local env, Global has no current_source/target_node
+    # runtime pointers to re-pick -- every action index directly encodes its own
+    # (source_node, target_node, ...) tuple, handled instead via the invalid-action short-circuit
+    # in step() below (the action_space cannot shrink without breaking the already-built SB3
+    # policy network).
+    def remove_node_dynamic(self, node_id):
+        if not self.remove_node_common(node_id):
+            return
+        if node_id in self.evolving_visible_graph.nodes():
+            self.evolving_visible_graph.remove_node(node_id)
 
     # Get the feature vector of a node, flattening it to a numpy array
     def get_node_feature_vector(self, node_id):
@@ -222,6 +268,39 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
         start_time = time.time()
         # map discrete choice to the action
         source_node, target_node, vulnerability_ID, outcome = self.calculate_discrete_action(action_index)
+        if source_node not in self.environment.nodes or target_node not in self.environment.nodes:
+            # action_index is stale: it encodes a node removed by dynamic leave since construction.
+            # action_space is intentionally NOT resized (would break the already-built SB3 policy
+            # network) -- treat as an invalid action instead, mirroring Local env's
+            # InvalidMovement pattern. This is crash-avoidance + reward penalty, not proper
+            # action-probability masking (deferred to the future node-join work).
+            self.vulnerability_type = None
+            self.reward = self.penalty_invalid_movement
+            self.outcome = model.InvalidMovement()
+            self.end_episode_reason = 0
+            self.truncated = self.done = False
+            self.maybe_apply_dynamic_step()
+            info = StepInfo(
+                description='CyberBattleEnvGlobal step info (invalid: stale node reference)',
+                duration_in_ms=time.time() - start_time,
+                step_count=self.stepcount,
+                source_node=source_node,
+                target_node=target_node,
+                source_node_tag="",
+                target_node_tag="",
+                vulnerability=vulnerability_ID,
+                vulnerability_type=None,
+                network_availability=self.network_availability,
+                outcome_class=self.outcome,
+                outcome=map_outcome_to_string(self.outcome),
+                end_episode_reason=self.end_episode_reason,
+            )
+            self.observation = [0 for _ in range(self.padded_num_nodes * len(self.node_feature_vector_size))]
+            for index, node in enumerate(self.discovered_nodes):
+                x = self.evolving_visible_graph.nodes[node]['x']
+                self.observation[index * len(x): (index + 1) * len(x)] = x
+            self.observation = {"graph": numpy.array(self.observation, dtype=numpy.float32)}
+            return self.observation, self.reward, self.done or self.truncated, info
         super().step_attacker_env(source_node, target_node, vulnerability_ID, outcome)
         # eventually update the evolving visible graph
         self.update_evolving_visible_graph_after_step(target_node)
@@ -243,8 +322,11 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
             outcome=map_outcome_to_string(self.outcome),
             end_episode_reason=self.end_episode_reason,
         )
+        # dynamic node population changes; source_node/target_node acted on this step are
+        # protected from removal by _get_removal_eligible_nodes, so info above is unaffected
+        self.maybe_apply_dynamic_step()
         # prepare the new observation vector
-        self.observation = [0 for _ in range(self.num_nodes * len(self.node_feature_vector_size))]
+        self.observation = [0 for _ in range(self.padded_num_nodes * len(self.node_feature_vector_size))]
         for index, node in enumerate(self.discovered_nodes):
             x = self.evolving_visible_graph.nodes[node]['x']
             self.observation[index * len(x): (index + 1) * len(x)] = x

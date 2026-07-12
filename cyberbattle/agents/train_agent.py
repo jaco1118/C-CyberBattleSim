@@ -37,6 +37,8 @@ from cyberbattle.utils.file_utils import save_yaml # noqa: E402
 from cyberbattle._env.static_defender import ScanAndReimageCompromisedMachines, ExternalRandomEvents # noqa: E402
 from cyberbattle.gae.model import GAEEncoder # noqa: E402
 from cyberbattle.utils.log_utils import setup_logging # noqa: E402
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 torch.set_default_dtype(torch.float32)
 script_dir = os.path.dirname(__file__)
@@ -102,6 +104,18 @@ def train_model(train_envs, logs_folder, config, run_id, val_envs=None, logger=N
     algorithm_config.pop('learning_rate', None)
     algorithm_config.pop('learning_rate_final', None)
 
+    extra_schedule_kwargs = {}
+    if 'clip_range' in algorithm_config:
+        if algorithm_config.get('clip_range_type') == "linear":
+            extra_schedule_kwargs['clip_range'] = linear_schedule(
+                algorithm_config['clip_range'], algorithm_config['clip_range_final']
+            )
+        else:  # constant clip range
+            extra_schedule_kwargs['clip_range'] = algorithm_config['clip_range']
+        algorithm_config.pop('clip_range_type', None)
+        algorithm_config.pop('clip_range', None)
+        algorithm_config.pop('clip_range_final', None)
+
     # Create the model
     model_class = algorithm_models[config['algorithm']]
 
@@ -129,7 +143,8 @@ def train_model(train_envs, logs_folder, config, run_id, val_envs=None, logger=N
                 logger.info("Initialized new model from scratch")
             model = model_class("MultiInputLstmPolicy", train_envs, policy_kwargs=config['policy_kwargs'],
                                 learning_rate=learning_rate,
-                                tensorboard_log=logs_folder, **algorithm_config, verbose=verbose, device=device)
+                                tensorboard_log=logs_folder, **algorithm_config, **extra_schedule_kwargs,
+                                verbose=verbose, device=device)
     else:
         lstm_keys = ['lstm_hidden_size', 'n_lstm_layers']
         for key in lstm_keys:
@@ -144,7 +159,8 @@ def train_model(train_envs, logs_folder, config, run_id, val_envs=None, logger=N
                 logger.info("Initialized new model from scratch")
             model = model_class("MultiInputPolicy", train_envs, policy_kwargs=config['policy_kwargs'],
                                     learning_rate=learning_rate,
-                                    tensorboard_log=logs_folder, **algorithm_config, verbose=verbose, device=device)
+                                    tensorboard_log=logs_folder, **algorithm_config, **extra_schedule_kwargs,
+                                    verbose=verbose, device=device)
 
     # Checkpoint periodic saving
     checkpoint_callback = CheckpointCallback(save_freq=config['checkpoints_save_freq'],
@@ -174,7 +190,7 @@ def train_model(train_envs, logs_folder, config, run_id, val_envs=None, logger=N
     try:
         model.learn(total_timesteps=config['train_iterations'], callback=callbacks)
     except Exception as e:
-        logger.error(f"Training failed due to errors: {e}, skipping this run")
+        logger.exception(f"Training failed due to errors: {e}, skipping this run")
         return
 
 # Setup the training via arguments provided
@@ -352,6 +368,18 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
             os.makedirs(os.path.join(envs_folder))
 
         config['num_environments'] = 0
+        # Only populated when environment_type == "global": CyberBattleGlobalEnv's action/observation
+        # space size depends on this specific topology's own node count and vulnerability catalogue,
+        # but RandomSwitchEnv fixes its action_space/observation_space once, from whichever topology
+        # instance loads first, and never revisits them when switching to a different instance
+        # mid-training. Every instance in the pool must therefore share one uniform, pre-computed
+        # size -- so global envs are collected here and padded/pickled in a second pass below,
+        # instead of being pickled immediately like the other two environment types.
+        global_envs_to_pad = []
+        # Same rationale as global_envs_to_pad above: CyberBattleLocalEnv's action space is
+        # node-count-invariant, but not vulnerability-catalogue-size-invariant across differently
+        # generated topologies, which can trip the same class of RandomSwitchEnv fixed-space bug.
+        local_envs_to_pad = []
         for element in tqdm(os.listdir(original_envs_folder), desc="Loading environments from the folder"):
             if os.path.isfile(os.path.join(original_envs_folder, element)):
                 with open(os.path.join(envs_folder, element), 'wb') as f: # saving into the destination folder
@@ -379,8 +407,12 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
                 # Use the network graph environment and map it to a C-CyberBattleSim environment
                 if args.environment_type == "global":
                     env = wrap_graphs_to_global_envs(network, logger, **config)
+                    global_envs_to_pad.append((element, env))
+                    continue
                 elif args.environment_type == "local":
                     env = wrap_graphs_to_local_envs(network, logger, **config)
+                    local_envs_to_pad.append((element, env))
+                    continue
                 else: #if args.environment_type == "continuous":
                     env = wrap_graphs_to_compressed_envs(network, logger, **config)
                     env.set_graph_encoder(graph_encoder)
@@ -388,6 +420,29 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
                 env.set_pca_components(config['pca_components'])
 
                 with open(os.path.join(envs_folder, f"{element}.pkl"), 'wb') as f: # saving into the destination folder
+                    pickle.dump(env, f)
+
+        if global_envs_to_pad:
+            max_action_space_size = max(len(env.flattened_action_space) for _, env in global_envs_to_pad)
+            max_num_nodes = max(env.num_nodes for _, env in global_envs_to_pad)
+            if config['verbose']:
+                logger.info("Padding %d global environments to a uniform action space of %d and %d nodes",
+                            len(global_envs_to_pad), max_action_space_size, max_num_nodes)
+            for element, env in global_envs_to_pad:
+                env.pad_to_uniform_size(max_num_nodes, max_action_space_size)
+                env.set_pca_components(config['pca_components'])
+                with open(os.path.join(envs_folder, f"{element}.pkl"), 'wb') as f:
+                    pickle.dump(env, f)
+
+        if local_envs_to_pad:
+            max_num_vulnerabilities_outcomes = max(env.num_vulnerabilities_outcomes for _, env in local_envs_to_pad)
+            if config['verbose']:
+                logger.info("Padding %d local environments to a uniform vulnerability/outcome catalogue of %d",
+                            len(local_envs_to_pad), max_num_vulnerabilities_outcomes)
+            for element, env in local_envs_to_pad:
+                env.pad_to_uniform_size(max_num_vulnerabilities_outcomes)
+                env.set_pca_components(config['pca_components'])
+                with open(os.path.join(envs_folder, f"{element}.pkl"), 'wb') as f:
                     pickle.dump(env, f)
 
         if config['verbose']:
@@ -425,7 +480,7 @@ if __name__ == "__main__":
     parser.add_argument('--algorithm', type=str, choices=['ppo', 'a2c', 'rppo', 'trpo', 'ddpg', 'sac', 'td3', 'tqc'], default='trpo', help='RL algorithm to train')
     parser.add_argument('--environment_type', type=str, choices=['continuous', 'global', 'local'], default='continuous', help='Type of environment to be used for training') # to be extended in the future to LOCAL or DISCRETE or others
     parser.add_argument('--num_runs', type=int, default=1, help='Number of runs')
-    parser.add_argument('-nlp', '--nlp_extractor', type=str, choices=["bert", "distilbert", "roberta", "gpt2", "CySecBERT", "SecureBERT", "SecBERT", "SecRoBERTa"], default="bert", help='NLP extractor to be used for extracting vulnerability embeddings')
+    parser.add_argument('-nlp', '--nlp_extractor', type=str, choices=["bert", "distilbert", "roberta", "gpt2", "CySecBERT", "SecureBERT", "SecBERT", "SecRoBERTa"], default="SecureBERT", help='NLP extractor to be used for extracting vulnerability embeddings')
     parser.add_argument('--holdout', action='store_true', default=False, help='Use holdout strategy and periodically evaluate on validation sets')
     parser.add_argument('--finetune_model', type=str, help='Path to the model to eventually finetune (relative to the logs folder)')
     parser.add_argument('--early_stopping', type=int, default=0, help='Early stopping on the validation environments setting the number of patience runs')

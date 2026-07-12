@@ -107,7 +107,26 @@ class RandomSwitchEnv(gymnasium.Env):
         self.current_observation = observation
         if self.done:
             # if episode finished, log statistics as fields since gathered by callbacks eventually, before the environment optionally switches
-            self.owned_nodes, self.discovered_nodes,  self.not_discovered_nodes, self.disrupted_nodes, self.num_nodes, self.reachable_count, self.discoverable_count, self.disruptable_count, self.network_availability, self.reimaged_nodes, self.num_events, self.discovered_amount, self.discoverable_amount, self.episode_won = self.current_env.get_statistics()
+            self.owned_nodes, self.discovered_nodes,  self.not_discovered_nodes, self.disrupted_nodes, self.num_nodes, self.reachable_count, self.discoverable_count, self.disruptable_count, self.network_availability, self.reimaged_nodes, self.num_events, self.discovered_amount, self.discoverable_amount, self.episode_won, self.root_owned_nodes = self.current_env.get_statistics()
+            # --- stranded-node capture (terminal state, before any reset) ---
+            _ROOT = model.PrivilegeLevel.ROOT
+            self.stranded_info = []
+            for _nid, _nd in self.current_env.environment.nodes(data=True):
+                _node = _nd["data"]
+                if not (_node.agent_installed and _nid != self.current_env.starter_node
+                        and _node.privilege_level != _ROOT):
+                    continue
+                _has_pe = any(isinstance(r.outcome, model.PrivilegeEscalation)
+                              for v in _node.vulnerabilities.values() for r in v.results)
+                _rates = [v.rates.successRate
+                          for v in _node.vulnerabilities.values() for r in v.results
+                          if isinstance(r.outcome, model.PrivilegeEscalation)]
+                self.stranded_info.append((_nid, int(_node.privilege_level), _has_pe, _rates))
+            if self.current_env.logger:
+                self.current_env.logger.info(
+                    "STRANDED_EPISODE owned_terminal=%d stranded=%s",
+                    len([n for n,d in self.current_env.environment.nodes(data=True) if d["data"].agent_installed]),
+                    self.stranded_info)
             self.overall_reimaged = self.current_env.overall_reimaged
             self.evicted = self.current_env.evicted
             self.episode_count += 1
@@ -164,7 +183,7 @@ class RandomSwitchEnv(gymnasium.Env):
 
     # Provide statistics of the last iteration (called at the end of the episode)
     def get_statistics(self):
-        return self.owned_nodes, self.discovered_nodes, self.not_discovered_nodes, self.disrupted_nodes, self.num_nodes, self.reachable_count, self.discoverable_count, self.disruptable_count, self.network_availability, self.reimaged_nodes, self.num_events, self.discovered_amount, self.discoverable_amount, self.episode_won
+        return self.owned_nodes, self.discovered_nodes, self.not_discovered_nodes, self.disrupted_nodes, self.num_nodes, self.reachable_count, self.discoverable_count, self.disruptable_count, self.network_availability, self.reimaged_nodes, self.num_events, self.discovered_amount, self.discoverable_amount, self.episode_won, self.root_owned_nodes
 
     # Set cut-off number of iterations per episode
     def set_cut_off(self, cut_off):

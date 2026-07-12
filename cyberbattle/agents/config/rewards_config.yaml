@@ -2,13 +2,13 @@
 
 rewards_dict:
   control:
-    value_coefficient: 3 # multiplies the value of the node owned exploiting the vulnerability
+    value_coefficient: 2 # multiplies the value of the node owned exploiting the vulnerability
     cost_coefficient: 1 # multiplies the cost of the vulnerability
-    node_discovered_coefficient: 25 # multiplier of the number of nodes discovered exploiting the vulnerability
+    node_discovered_coefficient: 15 # multiplier of the number of nodes discovered exploiting the vulnerability
     data_collected_reward: 20 # reward for collecting data (constant)
     data_exfiltrated_reward: 20 # reward for exfiltrating data (constant)
     persistence_reward: 20 # reward for persistence (constant)
-    privilege_escalation_reward: 100 # reward for privilege escalation (constant)
+    privilege_escalation_reward: 600 # reward for privilege escalation (constant)
     acquired_visibility_reward: 20 # reward for acquiring visibility (constant)
     dos_coefficient: -2 # multiplier of the value of the node attacked with DoS (negative action for control goals but not for disruption)
     defense_evaded_reward: 20 # reward for evading defense (constant)
@@ -77,17 +77,17 @@ penalties_dict:
     no_data_to_exfiltrate: -10 # penalty for trying to exfiltrate data from a node without data collected or no data in general
     already_persistent: -10 # penalty for trying to persist in a node in which we are already persistent
     machine_already_stopped: -10 # penalty for trying to stop a node that is already stopped
-    node_already_owned: -10 # penalty for trying to own a node that is already owned
-    node_already_visible: -10 # penalty for trying to acquire visibility in a node that is already visible
-    already_defense_evasion: -10 # penalty for trying to evade defense in a node that is already evading defense
-    scanning_unopen_port: -10 # penalty for using a vulnerability of a service in an unopen port
-    privilege_escalation_in_node_not_owned: -10 # penalty for trying to escalate privileges in a node that is not owned
-    privilege_escalation_to_level_already_had: -10 # penalty for trying to escalate privileges to a level that is already had
+    node_already_owned: -5 # penalty for trying to own a node that is already owned
+    node_already_visible: -5 # penalty for trying to acquire visibility in a node that is already visible
+    already_defense_evasion: -5 # penalty for trying to evade defense in a node that is already evading defense
+    scanning_unopen_port: -5 # penalty for using a vulnerability of a service in an unopen port
+    privilege_escalation_in_node_not_owned: -3 # penalty for trying to escalate privileges in a node that is not owned
+    privilege_escalation_to_level_already_had: -3 # penalty for trying to escalate privileges to a level that is already had
     outcome_not_valid: -10 # invalid outcome on remote vulnerability
     blocked_by_local_firewall: -10 # traffic blocked by outgoing rule in a local firewall
     blocked_by_remote_firewall: -10 # traffic blocked by incoming rule in a local firewall
-    invalid_action: -50  # invalid action (e.g., running an attack from a node that's not owned)
-    distance_penalty: -3 # coefficient to be multiplied by the distance
+    invalid_action: -15  # invalid action (e.g., running an attack from a node that's not owned)
+    distance_penalty: -1 # coefficient to be multiplied by the distance
   control_node:
     no_vulnerability_in_node: -10
     no_enough_privileges: -10

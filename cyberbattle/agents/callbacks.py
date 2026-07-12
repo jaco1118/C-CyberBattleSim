@@ -33,6 +33,7 @@ class TrainingCallback(BaseCallback):
         self.target_nodes = []
         self.min_distance_actions = []
         self.invalid_actions = 0
+        self.pe_target_nodes = set()
 
     def _on_step(self) -> bool:
         # Gather at every step the statistics and update variables
@@ -47,6 +48,9 @@ class TrainingCallback(BaseCallback):
         self.vulnerability_counts[info['vulnerability']] = self.vulnerability_counts.get(info['vulnerability'], 0) + 1
         self.target_node_tag_counts[info['target_node_tag']] = self.target_node_tag_counts.get(info['target_node_tag'], 0) + 1
         self.outcome_actions_counts[info['outcome']] = self.outcome_actions_counts.get(info['outcome'], 0) + 1
+        if issubclass(type(info['outcome_class']), m.PrivilegeEscalation):
+            self.pe_target_nodes.add(info['target_node'])
+
         if 'min_distance_action' in info:
             self.min_distance_actions.append(info['min_distance_action'])
 
@@ -65,7 +69,7 @@ class TrainingCallback(BaseCallback):
 
         # Log only once done is true the final episode statistics
         if done:
-            owned_nodes, discovered_nodes, not_discovered_nodes, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, reimaged_nodes, num_events, discovered_amount, discoverable_amount, _ = self.env.envs[0].get_statistics()
+            owned_nodes, discovered_nodes, not_discovered_nodes, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, reimaged_nodes, num_events, discovered_amount, discoverable_amount, _, root_owned_nodes = self.env.envs[0].get_statistics()
             self.logger.record("train/Owned nodes", owned_nodes)
             self.logger.record("train/Discovered nodes", discovered_nodes)
             self.logger.record("train/Discoverable amount", discoverable_amount)
@@ -101,6 +105,13 @@ class TrainingCallback(BaseCallback):
             self.logger.record("train/Disrupted nodes percentage", disrupted_percentage)
             self.logger.record("train/Relative owned nodes percentage",
                                    owned_nodes / (reachable_count+1)) #re-adding ther starter node
+            self.logger.record("train/Root owned nodes", root_owned_nodes)
+            # No +1 here: root_owned_nodes already excludes the starter node, and reachable_count == ownable_count,
+            # matching the win condition exactly — this metric reaches 1.0 precisely when the "control" goal is won.
+            self.logger.record("train/Relative root owned nodes percentage",
+                                root_owned_nodes / max(reachable_count, 1))
+            self.logger.record("train/Unique PE target nodes", len(self.pe_target_nodes))
+            self.logger.record("train/PE coverage ratio", len(self.pe_target_nodes) / max(owned_nodes, 1))
             self.logger.record("train/Relative discovered nodes percentage",
                                       discovered_nodes / (discoverable_count+1))
             self.logger.record("train/Relative discovered amount percentage",
@@ -142,7 +153,7 @@ class TrainingCallback(BaseCallback):
                 self.outcome_actions_counts[outcome] = 0
             for tag in self.target_node_tag_counts:
                 self.target_node_tag_counts[tag] = 0
-
+            self.pe_target_nodes = set()
         return True  # Continue training
 
 
@@ -198,6 +209,7 @@ class ValidationCallback(BaseCallback):
 
     def _run_evaluation(self):
         # lists containing metrics across episodes to perform subsequent aggregations
+        root_owned_list = []
         local_actions_count_list = []
         local_actions_success_list = []
         remote_actions_count_list = []
@@ -256,6 +268,27 @@ class ValidationCallback(BaseCallback):
                 obs, reward, done, info = self.val_env.step(action)
                 episode_rewards += reward
                 info = info[0]
+
+                if done:   # capture terminal state BEFORE the switcher resets
+                    cbenv = self.val_env.envs[0].unwrapped.current_env
+                    ROOT = m.PrivilegeLevel.ROOT
+                    owned = [nid for nid, nd in cbenv.environment.nodes(data=True)
+                             if nd["data"].agent_installed]
+                    self.output_logger.info("DIAG terminal owned=%d starter=%s",
+                                            len(owned), cbenv.starter_node)
+                    for nid, nd in cbenv.environment.nodes(data=True):
+                        node = nd["data"]
+                        if not (node.agent_installed and nid != cbenv.starter_node
+                                and node.privilege_level != ROOT):
+                            continue
+                        has_privesc = any(isinstance(r.outcome, m.PrivilegeEscalation)
+                                          for v in node.vulnerabilities.values() for r in v.results)
+                        rates = [v.rates.successRate
+                                 for v in node.vulnerabilities.values() for r in v.results
+                                 if isinstance(r.outcome, m.PrivilegeEscalation)]
+                        self.output_logger.info("STRANDED node=%s privlvl=%s has_privesc=%s rates=%s",
+                                                nid, int(node.privilege_level), has_privesc, rates)
+
                 if 'min_distance_action' in info:
                     min_distance_actions.append(info['min_distance_action'])
                 source_nodes.append(info['source_node'])
@@ -296,7 +329,8 @@ class ValidationCallback(BaseCallback):
                 min_distance_actions_list.append(0)
             else:
                 min_distance_actions_list.append(np.mean(min_distance_actions))
-            owned_nodes, discovered_nodes, not_discovered_nodes, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, reimaged_nodes, num_events, discovered_amount, discoverable_amount, _ = self.val_env.envs[0].get_statistics()
+            owned_nodes, discovered_nodes, not_discovered_nodes, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, reimaged_nodes, num_events, discovered_amount, discoverable_amount, _, root_owned_nodes = self.val_env.envs[0].get_statistics()
+            root_owned_list.append(root_owned_nodes)
             network_availability_list.append(network_availability)
             reachable_list.append(reachable_count + 1) # re include the starter node
             discoverable_list.append(discoverable_count + 1)
@@ -343,6 +377,7 @@ class ValidationCallback(BaseCallback):
             "not_discovered": np.mean(not_discovered_list),
             "episode_reward": np.mean(episode_reward_list),
             "owned_percentage": np.mean(owned_percentage_list),
+            "root_owned": np.mean(root_owned_list),
             "discovered_percentage": np.mean(discovered_percentage_list),
             "disrupted_percentage": np.mean(disrupted_percentage_list),
             "number_steps": np.mean(number_steps_list),
@@ -358,8 +393,12 @@ class ValidationCallback(BaseCallback):
             for outcome, count in outcome_actions_counts_list[i].items():
                 stats[outcome + "_outcomes_count"] = stats.get(outcome + "_outcomes_count", 0) + count
 
-        for outcome, count in outcome_actions_counts_list[0].items():
-            stats[outcome + "_outcomes_count"] = stats.get(outcome + "_outcomes_count", 0) / self.n_val_episodes
+        # for outcome, count in outcome_actions_counts_list[0].items():
+        #     stats[outcome + "_outcomes_count"] = stats.get(outcome + "_outcomes_count", 0) / self.n_val_episodes
+
+        for key in list(stats.keys()):
+            if key.endswith("_outcomes_count"):
+                stats[key] = stats[key] / self.n_val_episodes
 
         overall_tags_list = []
         for tag_counts in target_node_tag_counts_list:
@@ -398,6 +437,9 @@ class ValidationCallback(BaseCallback):
 
         self.logger.record("validation/Relative owned percentage (mean)",
                                custom_metrics['owned'] / custom_metrics['reachable'])
+        self.logger.record("validation/Root owned nodes (mean)", custom_metrics['root_owned'])
+        self.logger.record("validation/Relative root owned percentage (mean)",
+                            custom_metrics['root_owned'] / max(custom_metrics['reachable'], 1))
         self.logger.record("validation/Relative discovered percentage (mean)",
                                  custom_metrics['discovered'] / custom_metrics['discoverable'])
         self.logger.record("validation/Relative disrupted percentage (mean)",

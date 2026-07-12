@@ -117,17 +117,18 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             self.logger.info("Action space: " + str(self.action_space))
 
         if self.goal.endswith("node"):
-            # if node-specific goal, add the interest node embedding to the observation space together with the graph embeddings
             graph_box_space = spaces.Box(
                     low=-16, high=16,
-                    shape=(self.node_embeddings_dimensions * len(self.graph_embeddings_aggregations) + self.node_embeddings_dimensions,),
+                    shape=(self.node_embeddings_dimensions * len(self.graph_embeddings_aggregations) 
+                        + self.node_embeddings_dimensions  # owned_not_root_mean
+                        + self.node_embeddings_dimensions,), # interest node
                     dtype=numpy.float64
                 )
         else:
-            # if not node-specific goal, only the graph embeddings are present in the observation space as continuous vector
             graph_box_space = spaces.Box(
                     low=-16, high=16,
-                    shape=(self.node_embeddings_dimensions * len(self.graph_embeddings_aggregations),),
+                    shape=(self.node_embeddings_dimensions * len(self.graph_embeddings_aggregations)
+                        + self.node_embeddings_dimensions,), # owned_not_root_mean
                     dtype=numpy.float64
                 )
 
@@ -206,6 +207,10 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
     def add_node_evolving_visible_graph(self, node_id):
         self.evolving_visible_graph.add_node(node_id, x=self.get_node_feature_vector(node_id))
 
+    def remove_node_evolving_visible_graph(self, node_id):
+        if node_id in self.evolving_visible_graph.nodes():
+            self.evolving_visible_graph.remove_node(node_id)  # networkx auto-removes its edges
+            
     # Function to update the node in the evolving visible graph with its feature vector
     def update_node_evolving_visible_graph(self, node_id):
         self.evolving_visible_graph.nodes[node_id].update({'x': self.get_node_feature_vector(node_id)})
@@ -245,6 +250,27 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 edge_embedding)
             return True
 
+    def remove_node_dynamic(self, node_id):
+        # shared purge: ground-truth graph, discovered/owned tracking, win-condition denominators
+        if not self.remove_node_common(node_id):
+            return
+        # the agent's visible/encoded graph (feeds the observation)
+        self.remove_node_evolving_visible_graph(node_id)
+        # purge every stale reference to the removed node so it cannot resurface as a "ghost"
+        # node embedding or action key on a later step (which would crash get_node with a KeyError)
+        self.node_embeddings.pop(node_id, None)
+        self.action_embeddings = {
+            k: v for k, v in self.action_embeddings.items()
+            if k[0] != node_id and k[1] != node_id
+        }
+        self.processed_pairs = {p for p in self.processed_pairs if node_id not in p}
+        self.edges = [e for e in self.edges if e[0] != node_id and e[1] != node_id]
+        self.exploited_vulnerabilities_per_node_pairs.pop(node_id, None)
+        for source in list(self.exploited_vulnerabilities_per_node_pairs.keys()):
+            self.exploited_vulnerabilities_per_node_pairs[source].pop(node_id, None)
+        # NOTE: the re-encode + action-space rebuild happen in step() right after the dynamic change,
+        #       so the observation returned this step reflects the post-removal graph
+
     # Function leveraging the graph parameter and the GAE encoder to encode the graph and gather node embeddings
     def encode(self, graph):
         # Use the GAE Encoder to encode the graph
@@ -267,6 +293,8 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         if not running_nodes: # if no running nodes, return empty embeddings
             empty_embedding = np.zeros(self.node_embeddings_dimensions, dtype=np.float32)
             concatenated_result = np.concatenate([empty_embedding for _ in self.graph_embeddings_aggregations])
+            # NEW: also account for the owned_not_root slot in the empty-case shape
+            concatenated_result = np.concatenate([concatenated_result, empty_embedding])
             if self.goal.endswith("node"):
                 concatenated_result = np.concatenate([concatenated_result, empty_embedding])
             return node_embeddings, concatenated_result
@@ -292,8 +320,24 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             else:
                 raise ValueError(f"Unknown aggregation type: {agg_type}")
 
-        # if node-specific goal, add the interest node embedding to the observation vector
+        # Build the base observation FIRST
         observation_embedding = np.concatenate(graph_embeddings)
+
+        owned_not_root_nodes = [
+            node for node in running_nodes
+            if node in self.owned_nodes and node != self.starter_node
+            and self.get_node(node).privilege_level != model.PrivilegeLevel.ROOT
+        ]
+        if owned_not_root_nodes:
+            # Deterministic: always point at the same one until it's resolved, then move to the next
+            target_node = sorted(owned_not_root_nodes)[0]  # or pick by highest node_info.value for priority
+            next_escalation_target = node_embeddings[target_node]
+        else:
+            next_escalation_target = np.zeros(self.node_embeddings_dimensions, dtype=np.float32)
+
+        observation_embedding = np.concatenate([observation_embedding, next_escalation_target])
+
+        # THEN handle the node-specific goal case (unchanged logic, now operating on the updated observation_embedding)
         if self.goal.endswith("node"):
             if self.interest_node in running_nodes:
                 observation_embedding = np.concatenate([observation_embedding, node_embeddings[self.interest_node]])
@@ -302,7 +346,7 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             if self.interest_node not in self.discovered_nodes and self.interest_node in node_embeddings: # remove if fictious interest node was added
                 node_embeddings.pop(self.interest_node)
         return node_embeddings, observation_embedding
-
+        
     # discrete features to be added to the observation vector to provide additional information to understand semantics of graph embedding
     def create_discrete_features(self):
         discrete_features = []
@@ -446,6 +490,16 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             end_episode_reason=self.end_episode_reason,
             min_distance_action=distance
         )
+        nodes_removed = self.maybe_apply_dynamic_step()
+        if nodes_removed:
+            # a node was removed after the observation/action space were already built this step;
+            # re-encode and rebuild so we do not hand back a stale observation or action space
+            self.node_embeddings, self.observation = self.encode(self.evolving_visible_graph)
+            self.observation = {
+                "graph_embeddings": self.observation,
+                "discrete_features": self.create_discrete_features()
+            }
+            self.create_continuous_action_space()
         return self.observation, self.reward, self.done or self.truncated, info
 
     # Function determining if a certain outcome changes the evolving visible graph
@@ -463,7 +517,7 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
     def update_evolving_visible_graph_after_step(self, source_node, target_node, vulnerability_ID):
         # Update the graph that should turn into a graph embedding
         for node in self.discovered_nodes:
-            if node not in self.evolving_visible_graph.nodes():
+            if node not in self.evolving_visible_graph.nodes() and node in self.environment.nodes:
                 self.add_node_evolving_visible_graph(node)
 
         # If an action that should modify the node feature vectors is issued, modify the graph embedding since the graph should change
@@ -571,6 +625,9 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             'l2': lambda x, y: np.linalg.norm(x - y, ord=2, axis=1),
             'inf': lambda x, y: np.linalg.norm(x - y, ord=np.inf, axis=1),
             'cosine': lambda x, y: distance_cosine.cdist(x, y, 'cosine').flatten()
+            # 'cosine': lambda x, y: distance_cosine.cdist(
+            #     np.atleast_2d(x), np.atleast_2d(y), 'cosine'
+            # ).flatten()
         }
 
         if self.distance_metric not in metric_mapping:

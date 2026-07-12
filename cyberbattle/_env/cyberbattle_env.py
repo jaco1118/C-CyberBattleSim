@@ -9,6 +9,7 @@
 """
 
 import time
+import math
 from typing import Optional, List
 import random
 import gym as gym
@@ -56,6 +57,18 @@ class CyberBattleEnv(gym.Env):
                  max_num_trials_find_feasible_starter_node=1000, # maximum number of trials to find a feasible starter node
                  verbose=0, # 0 nothing, 1 print only training information, 2 print also episode information, 3 print also single iteration information
                  logger=None,
+                 change_interval=20, # calibration anchor: 1/change_interval is the expected steady-state
+                                      # removal probability per step at full ramp for dynamic_mode="leave";
+                                      # also still the literal period for legacy patch/service changes
+                 change_type="patch", # legacy patch/service change_type: "patch" | "service" | "mixed"
+                 patch_service_dynamic_enabled=True, # enables the legacy patch/service/mixed changes (unrelated to node leave/join)
+                 dynamic_mode="none", # node population dynamics: "none" | "leave" | "join" | "both" ("join" is a scaffolded no-op for now)
+                 dynamic_min_alive_nodes=5, # absolute floor: dynamic leave never drops alive node count below this
+                 dynamic_min_alive_fraction=0.5, # relative floor: fraction of the original topology size, combined with the absolute floor via max()
+                 dynamic_batch_interval=150, # mean steps between low-rate Poisson "batch outage" events
+                 dynamic_batch_size_mean=1.0, # mean of the Poisson term added to the guaranteed 1 when a batch event fires
+                 dynamic_batch_max_fraction=0.3, # cap on batch size as a fraction of the current eligible pool
+                 dynamic_degree_weighting=True, # weight per-node removal probability down for high-degree/critical nodes
                  **kwargs
                  ):
         self.environment = None
@@ -81,6 +94,17 @@ class CyberBattleEnv(gym.Env):
         self.max_num_trials_find_feasible_starter_node = max_num_trials_find_feasible_starter_node
         self.verbose = verbose
         self.logger = logger
+        self.change_interval = change_interval
+        self.patch_service_dynamic_enabled = patch_service_dynamic_enabled
+        self.change_type = change_type
+        self.dynamic_mode = dynamic_mode
+        self.dynamic_min_alive_nodes = dynamic_min_alive_nodes
+        self.dynamic_min_alive_fraction = dynamic_min_alive_fraction
+        self.dynamic_batch_interval = dynamic_batch_interval
+        self.dynamic_batch_size_mean = dynamic_batch_size_mean
+        self.dynamic_batch_max_fraction = dynamic_batch_max_fraction
+        self.dynamic_degree_weighting = dynamic_degree_weighting
+        self._dynamic_change_count = 0
         self.__initial_environment: model.Model = initial_environment
         self.done = False
         self.num_nodes = len(self.__initial_environment.network.nodes)
@@ -142,6 +166,10 @@ class CyberBattleEnv(gym.Env):
         self.discovered_amount = 0
         self.overall_reimaged = []
         self.num_events = 0
+        self._dynamic_change_count = 0
+        self._dynamic_removed_this_episode: List[model.NodeID] = []
+        self._join_noop_logged = False
+        self._dynamic_last_applied_iteration = -1
         self.discovered_nodes: List[model.NodeID] = []
         self.owned_nodes: List[model.NodeID] = []
         self.episode_rewards: List[float] = []
@@ -359,11 +387,232 @@ class CyberBattleEnv(gym.Env):
         self.outcome_desired = outcome_desired
         self.outcome_obtained = result.outcome
         self.network_availability = len([node for node in self.discovered_nodes if
-                                      self.get_node(node).status == model.MachineStatus.Running]) / len(self.discovered_nodes)
+                                      node in self.environment.nodes and self.get_node(node).status == model.MachineStatus.Running]) / len(self.discovered_nodes)
         if self.verbose > 2:
             self.logger.info("Network availability after step: %f", self.network_availability)
         self.episode_rewards.append(self.reward)
         self.num_iterations += 1
+
+    # Module-level, non-tunable numerical safety rail on any single node's per-step removal
+    # probability. At realistic settings (small change_interval relative to eligible pool size)
+    # this essentially never binds; it exists purely to bound pathological configs.
+    _DYNAMIC_P_MAX = 0.25
+
+    # Orchestrator called once per step, unconditionally, by every subclass's step() (no modulo
+    # gate at the call site -- the modulo gating for legacy patch/service changes lives inside
+    # here, and the new probabilistic leave logic has its own internal ramping/floor logic).
+    # Returns the list of node IDs actually removed this step (empty list if nothing happened).
+    def maybe_apply_dynamic_step(self) -> List["model.NodeID"]:
+        if self.num_iterations == 0:
+            return []
+        # Local/Global "switch"/invalid-action paths don't call step_attacker_env, so
+        # num_iterations doesn't advance for them; without this guard, an agent spamming such
+        # actions could re-trigger the probabilistic draws multiple times at the same logical
+        # timestep, inflating the calibrated rate. Compressed env always advances num_iterations
+        # every step(), so this is a no-op there.
+        if self.num_iterations == self._dynamic_last_applied_iteration:
+            return []
+        self._dynamic_last_applied_iteration = self.num_iterations
+        if self.patch_service_dynamic_enabled and self.num_iterations % self.change_interval == 0:
+            self._apply_legacy_dynamic_change()
+        removed: List["model.NodeID"] = []
+        if self.dynamic_mode in ("leave", "both"):
+            removed = self._apply_dynamic_leave()
+        if self.dynamic_mode in ("join", "both"):
+            self._dynamic_join_noop()
+        return removed
+
+    # Legacy patch/service/mixed changes: node-count invariant, unrelated to the node
+    # leave/join population dynamics. Kept as-is, just no longer dispatches "node_leave".
+    def _apply_legacy_dynamic_change(self):
+        self._dynamic_change_count += 1
+        if self.change_type == "patch":
+            self._patch_random_vulnerability()
+        elif self.change_type == "service":
+            self._disable_random_service()
+        elif self.change_type == "mixed":
+            # alternate between the two
+            if self._dynamic_change_count % 2 == 0:
+                self._patch_random_vulnerability()
+            else:
+                self._disable_random_service()
+
+    # Nodes eligible to be dynamically removed: discovered, running, and not one of the
+    # currently-protected roles (starter/source/target/interest node).
+    def _get_removal_eligible_nodes(self):
+        return [
+            node for node in self.discovered_nodes
+            if self.get_node(node).status == model.MachineStatus.Running
+            and node != self.starter_node
+            and node != self.source_node
+            and node != self.target_node
+            and node != getattr(self, "interest_node", None)
+        ]
+
+    # Hard safety floor: the minimum number of alive nodes that dynamic leave may never drop
+    # below, on top of the starter/source/target/interest-node exclusion above. Combines an
+    # absolute floor and a floor proportional to the *original* topology size (self.num_nodes,
+    # fixed at construction) via max(), so small topologies still keep a meaningful fraction.
+    def _get_dynamic_floor(self) -> int:
+        floor = max(self.dynamic_min_alive_nodes, math.ceil(self.dynamic_min_alive_fraction * self.num_nodes))
+        return min(floor, self.num_nodes)
+
+    # Count of nodes still present in the *whole* current topology graph (self.environment.nodes).
+    # Deliberately counts graph presence, not running status, and deliberately not scoped to
+    # self.discovered_nodes: get_alive_nodes() (discovered-only) starts at 1 right after reset, so
+    # using it here would starve dynamic leave for most of an episode. Using running-status instead
+    # of presence would also be wrong the other way -- ordinary gameplay (DoS/disruption actions,
+    # entirely unrelated to dynamic leave) can stop a node without removing it from the graph, and
+    # the floor must guard against dynamic leave depopulating the topology, not against those
+    # pre-existing mechanics reducing the running-node count.
+    def _count_alive_topology_nodes(self) -> int:
+        return len(self.environment.nodes)
+
+    # Probabilistic node-leave: per-node Bernoulli draw each step (probability weighted down for
+    # high-degree/critical nodes), plus a low-rate Poisson-triggered batch removal, calibrated so
+    # the expected removal rate matches change_interval as a sanity anchor, and ramped down as the
+    # eligible pool approaches the safety floor. Replaces the old deterministic "exactly one node
+    # every change_interval steps, forever, uncapped" trigger.
+    def _apply_dynamic_leave(self) -> List["model.NodeID"]:
+        if not hasattr(self, "remove_node_dynamic"):
+            self.logger.warning(
+                "[DynamicEnv] dynamic_mode=%r requires an environment implementing "
+                "remove_node_dynamic; skipping removal", self.dynamic_mode
+            )
+            return []
+
+        eligible = self._get_removal_eligible_nodes()
+        if not eligible:
+            return []
+
+        alive = self._count_alive_topology_nodes()
+        floor = self._get_dynamic_floor()
+        room = max(0, alive - floor)
+        if room == 0:
+            return []
+
+        # soft taper towards 0 as the eligible pool shrinks towards the floor, instead of a hard wall
+        ramp = min(1.0, room / max(1, self.num_nodes - floor))
+
+        # calibration anchor: at full ramp, expected removals per step equal 1/change_interval,
+        # matching the old deterministic rate; this decays as attrition proceeds (the old scheme
+        # never tapered, which is what let it strip the whole topology over a long episode)
+        target_rate = ramp * (1.0 / self.change_interval)
+
+        if self.dynamic_degree_weighting:
+            degrees = {n: self.environment.degree(n) for n in eligible}
+            weights = {n: 1.0 / (1.0 + degrees[n]) for n in eligible}
+        else:
+            weights = {n: 1.0 for n in eligible}
+        weight_sum = sum(weights.values())
+
+        # sum(p) == target_rate by construction (before the P_MAX clip, which essentially never
+        # binds at realistic settings) -- degree weighting only reallocates *which* node is likely
+        # removed, not the expected *count* removed per step.
+        probabilities = {
+            n: min(self._DYNAMIC_P_MAX, target_rate * weights[n] / weight_sum)
+            for n in eligible
+        }
+        hits = [n for n in eligible if random.random() < probabilities[n]]
+
+        # low-rate Poisson "batch outage" trigger, independent of the per-node draws above
+        p_batch_trigger = ramp / self.dynamic_batch_interval
+        if random.random() < p_batch_trigger:
+            batch_pool = [n for n in eligible if n not in hits]
+            if batch_pool:
+                batch_size = 1 + numpy.random.poisson(self.dynamic_batch_size_mean)
+                batch_size = min(batch_size, len(batch_pool), max(1, int(self.dynamic_batch_max_fraction * len(eligible))))
+                batch_weights = numpy.array([weights[n] for n in batch_pool], dtype=numpy.float64)
+                batch_weights = batch_weights / batch_weights.sum()
+                batch_hits = numpy.random.choice(batch_pool, size=batch_size, replace=False, p=batch_weights)
+                hits += list(batch_hits)
+
+        # belt-and-braces floor enforcement: independent Bernoulli hits plus a batch event could
+        # in principle exceed room in one step even with ramping
+        if len(hits) > room:
+            hits = random.sample(hits, room)
+
+        for node_id in hits:
+            self.remove_node_dynamic(node_id)
+            if self.verbose > 0:
+                self.logger.info(
+                    "[DynamicEnv] Step %d: removed node %s (floor=%d)",
+                    self.num_iterations, node_id, floor
+                )
+        return hits
+
+    # Extension point for dynamic_mode="join"/"both": not implemented in this change (requires a
+    # max_nodes over-provisioning scheme and action masking for the fixed-size discrete envs to
+    # add brand-new nodes without breaking already-built SB3 policy networks). Logs once per
+    # episode so long training runs aren't silently misled about what's actually happening.
+    def _dynamic_join_noop(self):
+        if not self._join_noop_logged:
+            self.logger.warning(
+                "[DynamicEnv] dynamic_mode=%r requests node-join, which is not yet implemented "
+                "(new nodes only, no rejoin) -- no-op this episode", self.dynamic_mode
+            )
+            self._join_noop_logged = True
+
+    # Shared purge logic used by every subclass's remove_node_dynamic: ground-truth graph removal,
+    # discovered_nodes/owned_nodes pruning, and win-condition denominator decrement (only for the
+    # sets the node actually belonged to, to avoid triggering a spurious win). This operates
+    # entirely on base-class state, so it is not duplicated per subclass; only the
+    # observation/action-space-specific purge (embeddings, evolving_visible_graph, ...) differs.
+    def remove_node_common(self, node_id) -> bool:
+        if node_id == self.starter_node:
+            return False
+        if node_id in self.environment.nodes():
+            self.environment.remove_node(node_id)
+        if node_id in self.discovered_nodes:
+            self.discovered_nodes.remove(node_id)
+        if node_id in self.owned_nodes:
+            self.owned_nodes.remove(node_id)
+        if getattr(self, "shortest_paths_starter_control", None) and \
+                self.shortest_paths_starter_control.get(node_id) is not None and self.ownable_count > 0:
+            self.ownable_count -= 1
+        if getattr(self, "shortest_paths_starter_discovery", None) and \
+                self.shortest_paths_starter_discovery.get(node_id) is not None and self.discoverable_count > 0:
+            self.discoverable_count -= 1
+        if getattr(self, "shortest_paths_starter_disruption", None) and \
+                self.shortest_paths_starter_disruption.get(node_id) is not None and self.disruptable_count > 0:
+            self.disruptable_count -= 1
+        self._dynamic_removed_this_episode.append(node_id)
+        return True
+
+    def _patch_random_vulnerability(self):
+        running_nodes = [
+            node for node in self.discovered_nodes
+            if self.get_node(node).status == model.MachineStatus.Running
+        ]
+        if not running_nodes:
+            return
+        node_id = random.choice(running_nodes)
+        node_info = self.get_node(node_id)
+        if node_info.vulnerabilities:
+            vuln_id = random.choice(list(node_info.vulnerabilities.keys()))
+            del node_info.vulnerabilities[vuln_id]
+            self.logger.info(
+                "[DynamicEnv] Step %d: Patched vuln '%s' on node %s",
+                self.num_iterations, vuln_id, node_id
+            )
+
+    def _disable_random_service(self):
+        running_nodes = [
+            node for node in self.discovered_nodes
+            if self.get_node(node).status == model.MachineStatus.Running
+        ]
+        if not running_nodes:
+            return
+        node_id = random.choice(running_nodes)
+        node_info = self.get_node(node_id)
+        active_services = [s for s in node_info.services if s.running]
+        if active_services:
+            service = random.choice(active_services)
+            service.running = False
+            self.logger.info(
+                "[DynamicEnv] Step %d: Disabled service '%s' on node %s",
+                self.num_iterations, service.name, node_id
+            )
 
     # Function to update the environment data structures based on the outcome of the action taken
     def update_episode_by_outcome(self, outcome, target_node):
@@ -372,7 +621,10 @@ class CyberBattleEnv(gym.Env):
             newly_discovered_nodes_count = 0
             outcome.new_nodes = []
             for node in outcome.nodes:
-                if node not in self.discovered_nodes:
+                # skip nodes that have been dynamically removed from the environment;
+                # their static Reconnaissance lists may still reference them, but they
+                # must not be re-added to discovered_nodes (get_node would KeyError)
+                if node not in self.discovered_nodes and node in self.environment.nodes:
                     self.discovered_nodes.append(node)
                     newly_discovered_nodes_count += 1
                     outcome.new_nodes.append(node)
@@ -427,6 +679,8 @@ class CyberBattleEnv(gym.Env):
 
     # Function to check if the proportional cut-off has been reached, i.e. the number of iterations is greater than the number of nodes times the coefficient
     def proportional_cutoff_reached(self):
+        if self.proportional_cutoff_coefficient == -1:
+            return False  # No cutoff — run until goal or max_steps
         if self.num_iterations >= self.proportional_nodes * self.proportional_cutoff_coefficient:
             return True
         return False
@@ -444,15 +698,15 @@ class CyberBattleEnv(gym.Env):
                     self.logger.info("Attacker won the episode since all nodes controlled at root level...")
                 return True # in control games, episode finished when all nodes potentially controllable are controlled
         elif self.goal == "disruption":
-            stopped_nodes = [node for node in self.discovered_nodes if self.get_node(node).status == model.MachineStatus.Stopped and node != self.starter_node]
+            stopped_nodes = [node for node in self.discovered_nodes if node in self.environment.nodes and self.get_node(node).status == model.MachineStatus.Stopped and node != self.starter_node]
             if len(stopped_nodes) == self.disruptable_count: # in disruption, if all nodes potentially disruptable are disrupted
                 if self.verbose > 1:
                     self.logger.info("Attacker won the episode since all nodes except the starter node have been disrupted...")
                 return True
         elif self.goal == "discovery":
             discovered_nodes = [node for node in self.discovered_nodes if node != self.starter_node]
-            data_owning_nodes = [node for node in self.discovered_nodes if self.get_node(node).has_data]
-            data_collected_not_exfiltred = [node for node in self.discovered_nodes if self.get_node(node).data_collected and not self.get_node(node).data_exfiltrated]
+            data_owning_nodes = [node for node in self.discovered_nodes if node in self.environment.nodes and self.get_node(node).has_data]
+            data_collected_not_exfiltred = [node for node in self.discovered_nodes if node in self.environment.nodes and self.get_node(node).data_collected and not self.get_node(node).data_exfiltrated]
             if len(discovered_nodes) == self.discoverable_count and len(data_owning_nodes) == 0 and len(data_collected_not_exfiltred) == 0:
                 if self.verbose > 1:
                     self.logger.info("Attacker won the episode since all nodes and data have been discovered and exfiltrated...")
@@ -488,16 +742,17 @@ class CyberBattleEnv(gym.Env):
     # Called at the end of the episode to gather statistics:
     def get_statistics(self):
         owned_nodes = [node_id for node_id, node_data in self.environment.nodes.items() if node_data["data"].agent_installed]
+        # Root-owned nodes: mirrors the exact win-condition logic in attacker_goal_reached() for "control"
+        root_owned_nodes = [node for node in self.owned_nodes if self.get_node(node).privilege_level == model.PrivilegeLevel.ROOT and node != self.starter_node]
         discovered_nodes = self.discovered_nodes
         not_discovered_nodes = [node_id for node_id, node_data in self.environment.nodes.items() if node_id not in self.discovered_nodes]
-        disrupted_nodes = [node_id for node_id in self.discovered_nodes if self.get_node(node_id).status == model.MachineStatus.Stopped]
-        self.network_availability = len([node for node in self.discovered_nodes if
-                                         self.get_node(node).status == model.MachineStatus.Running]) / len(self.discovered_nodes)
-        return len(owned_nodes), len(discovered_nodes), len(not_discovered_nodes), len(disrupted_nodes), self.num_nodes, self.ownable_count, self.discoverable_count, self.disruptable_count, self.network_availability, len(self.overall_reimaged), self.num_events, self.discovered_amount, self.discoverable_amount, self.attacker_goal_reached()
+        disrupted_nodes = [node_id for node_id in self.discovered_nodes if node_id in self.environment.nodes and self.get_node(node_id).status == model.MachineStatus.Stopped]
+        self.network_availability = len([node for node in self.discovered_nodes if node in self.environment.nodes and self.get_node(node).status == model.MachineStatus.Running]) / len(self.discovered_nodes)
+        return len(owned_nodes), len(discovered_nodes), len(not_discovered_nodes), len(disrupted_nodes), self.num_nodes, self.ownable_count, self.discoverable_count, self.disruptable_count, self.network_availability, len(self.overall_reimaged), self.num_events, self.discovered_amount, self.discoverable_amount, self.attacker_goal_reached(), len(root_owned_nodes)
 
     # Function to get the list of alive nodes, i.e. nodes that are running
     def get_alive_nodes(self):
-        return [node_id for node_id in self.discovered_nodes if self.get_node(node_id).status == model.MachineStatus.Running]
+        return [node_id for node_id in self.discovered_nodes if node_id in self.environment.nodes and self.get_node(node_id).status == model.MachineStatus.Running]
 
     # Function to get the list of nodes in the environment
     def get_nodes(self):

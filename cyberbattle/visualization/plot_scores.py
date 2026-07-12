@@ -142,7 +142,8 @@ def process_results(yaml_data, dimension, indicators):
                 value = "RoBERTa"
             elif value == "bert":
                 value = "BERT"
-            results[f"{value}"] = np.array([scores_control, scores_discovery, scores_disruption])
+            min_len = min(len(scores_control), len(scores_discovery), len(scores_disruption))
+            results[f"{value}"] = np.array([scores_control.values[:min_len], scores_discovery.values[:min_len], scores_disruption.values[:min_len]])
         else:
             subset_control = subset[subset["Goal"] == "control"]
             subset_discovery = subset[subset["Goal"] == "discovery"]
@@ -154,7 +155,8 @@ def process_results(yaml_data, dimension, indicators):
 
             if value == "random":
                 value = "Random"
-            results[value] = np.array([scores_control, scores_discovery, scores_disruption])
+            min_len = min(len(scores_control), len(scores_discovery), len(scores_disruption))
+            results[value] = np.array([scores_control.values[:min_len], scores_discovery.values[:min_len], scores_disruption.values[:min_len]])
 
     return results, order
 
@@ -526,7 +528,7 @@ if __name__ == "__main__":
     os.makedirs(logs_folder, exist_ok=True)
 
     for folder in args.folders:
-        source_dir = os.path.join(script_dir, "..", "agents", "logs", folder)
+        source_dir = os.path.normpath(os.path.join(script_dir, "..", "agents", "logs", folder))
         copy_and_rename_files(source_dir, logs_folder, args.option=="variation", args.option=="train_val_test")
 
     output = os.path.join(logs_folder, 'results.yaml')

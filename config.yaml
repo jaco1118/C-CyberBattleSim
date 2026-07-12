@@ -7,9 +7,9 @@ gae_url: "https://www.dropbox.com/scl/fi/80t02bvzh65ixrqnaw6yz/gae.zip?rlkey=rwb
 default_environments_url: "https://www.dropbox.com/scl/fi/03hv27csx9xfjjw0mfuep/scenarios.zip?rlkey=vuc7d10nwuigo4dj0a8ql8gvo&st=h77i7kua&dl=1"
 
 # Internal paths used to identify main components
-vulnerability_classifier_path: "classifier"
-nvd_data_path: "default_data"
-gae_path: "GAE_2024-11-20_08-59-57"
+vulnerability_classifier_path: "classifier/pytorch_model.bin"
+nvd_data_path: "default_data/"
+gae_path: "default/"
 #gae_dimensionality_reduction_path: # paths of GAE models trained on spaces with dimensionality reduction applied
 #  10: "num_components=10" # relative to cyberbattle/gae/logs (optional)
-default_environments_path: "graphs_sample_2026-04-17_11-04-02"
+default_environments_path: "syntethic_deployment_20_graphs_100_nodes"

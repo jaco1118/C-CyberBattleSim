@@ -154,7 +154,15 @@ def add_nodes_to_graph(G, num_nodes, services, categories):
         node_id = f"Node_{i + 1}"
         G.add_node(node_id, services=services[i], category=categories[i])
 
-
+def privesc_coverage_ok(vulnerabilities_stats, min_privesc=1, privesc_key="privilege escalation"):
+    per_node = vulnerabilities_stats.get("outcomes_nodes_presence", {})
+    if not per_node:
+        return False
+    return all(
+        len(outcomes.get(privesc_key, [])) >= min_privesc
+        for outcomes in per_node.values()
+    )
+    
 # Main function to generate network graphs
 def generate_network_graphs(logs_folder, config, categories_config, category_samples, nlp_extractors, logger, verbose=1):
     overall_graphs_stats = []
@@ -207,6 +215,12 @@ def generate_network_graphs(logs_folder, config, categories_config, category_sam
             if verbose > 1:
                 logger.warning("Restarting the generation of the graph %d as the generated graph does not satisfy the connectivity thresholds", graph_id + 1)
             continue
+
+        # vulnerabilities_stats = collect_vulnerability_data(model)   # you compute this anyway in Step 6
+        # if not privesc_coverage_ok(vulnerabilities_stats, min_privesc=1):
+        #     if verbose > 1:
+        #         logger.warning("Regenerating graph %d: node(s) lack privilege-escalation coverage", graph_id + 1)
+        #     continue
 
         if verbose > 1:
             logger.info("Graph %d has been successfully generated with proper probabilities respecting connectivity thresholds", graph_id + 1)

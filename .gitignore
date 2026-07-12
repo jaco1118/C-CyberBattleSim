@@ -7,3 +7,12 @@ cyberbattle/agents/logs/*
 cyberbattle/gae/logs/*
 cyberbattle/models/*
 cyberbattle/visualization/logs/*
+
+# Secrets - never commit API keys/credentials
+cyberbattle/data_generation/config/auth.yaml
+**/auth.yaml
+*.env
+
+# Dissertation work log - local drafting aid only, not for version control
+# (see the header note in the file itself for why)
+dissertation_log.md

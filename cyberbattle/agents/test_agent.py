@@ -280,6 +280,11 @@ def load_test_envs(run_folder, args, train_config, test_config, logger=None, sta
     graph_encoder.load_state_dict(torch.load(train_config['graph_encoder_path']))
     graph_encoder.eval()
 
+    # allow test-time dynamic-environment mode to differ from what the model was trained under
+    # (e.g. trained static / tested dynamic), independent of the frozen train_config.yaml snapshot
+    if 'dynamic_mode' in test_config:
+        train_config['dynamic_mode'] = test_config['dynamic_mode']
+
     # map to classes after saving the configuration
     if args.static_defender_agent:
         map_dict = {

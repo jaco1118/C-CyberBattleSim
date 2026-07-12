@@ -18,7 +18,7 @@ from cyberbattle.utils.classifier_utils import VulnerabilityClassifier
 # Function used to draw a probability from a uniform distribution based on a score
 def scale_probability_range_with_score(probability_range, score, score_range=None):
     if not score_range:
-        score_range = [0, 10]
+        score_range = [0, 1]
     if score is None:
         return random.uniform(probability_range[0], probability_range[1])
     if score < 0:

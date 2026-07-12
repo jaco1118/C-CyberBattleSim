@@ -1,6 +1,7 @@
 # Configuration file for the generation of the graphs
 
-num_nodes_range: [5, 20]
+# num_nodes_range: [5, 20]
+num_nodes_range: [10, 15]
 num_services_range: [1, 2]
 homogeneity_range: [0.1, 0.1] # do not go below 0.1 otherwise it goes to infinite and may crash
 firewall_rule_incoming_probability_range: [0, 0] # probability there will be an incoming BLOCK rule on each protocol we are LISTENING on

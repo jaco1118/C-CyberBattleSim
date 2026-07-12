@@ -127,6 +127,26 @@ class CyberBattleLocalEnv(CyberBattleEnv):
                 self.nodes_dict[node] = len(self.nodes_dict)
         return self.nodes_dict
 
+    # Pads this env's (vulnerability, outcome) action catalogue to a uniform size shared across a
+    # batch of topology instances. RandomSwitchEnv fixes its action_space once, from whichever
+    # topology instance loads first, and never revisits it when switching to a different instance
+    # mid-training. Unlike CyberBattleGlobalEnv, this action space is node-count-invariant, but it
+    # is NOT vulnerability-catalogue-size-invariant: different randomly-generated topologies can
+    # have different numbers of distinct (vulnerability, outcome) pairs, so a policy sized against
+    # a larger catalogue can sample an action index landing in the "gap" between a smaller
+    # topology's own catalogue and its two switching actions, silently skipping both step()
+    # branches and leaving self.outcome unset. Called once per env, over the full topology set,
+    # before any of them are wrapped in a RandomSwitchEnv.
+    def pad_to_uniform_size(self, target_num_vulnerabilities_outcomes):
+        if target_num_vulnerabilities_outcomes > self.num_vulnerabilities_outcomes:
+            self.flattened_action_space.extend(
+                [(None, None)] * (target_num_vulnerabilities_outcomes - self.num_vulnerabilities_outcomes)
+            )
+            self.num_vulnerabilities_outcomes = target_num_vulnerabilities_outcomes
+            self.action_space = spaces.Discrete(self.num_vulnerabilities_outcomes + 2)
+            if self.verbose > 1:
+                self.logger.info("Padded vulnerability/outcome catalogue to %d entries", self.num_vulnerabilities_outcomes)
+
     # Reset function calling super.reset and initializing the evolving visible graph and the observation
     def reset(self, **kwargs):
         super().reset_env()
@@ -153,6 +173,22 @@ class CyberBattleLocalEnv(CyberBattleEnv):
         self.evolving_visible_graph = nx.DiGraph()
         self.evolving_visible_graph.clear()
         self.add_node_evolving_visible_graph(self.starter_node) # initial node
+
+    # Dynamically remove a node (called by the base class's dynamic-leave mechanism). Purges the
+    # node from the evolving visible graph and, critically, re-picks current_source_node/
+    # current_target_node if either points at the removed node -- otherwise the next step()'s call
+    # into step_attacker_env would exploit a vulnerability on a node that no longer exists.
+    def remove_node_dynamic(self, node_id):
+        if not self.remove_node_common(node_id):
+            return
+        if node_id in self.evolving_visible_graph.nodes():
+            self.evolving_visible_graph.remove_node(node_id)
+        if self.current_source_node == node_id:
+            candidates = [n for n in self.owned_nodes if n != node_id]
+            self.current_source_node = random.choice(candidates) if candidates else self.starter_node
+        if self.current_target_node == node_id:
+            candidates = [n for n in self.discovered_nodes if n != node_id]
+            self.current_target_node = random.choice(candidates) if candidates else self.starter_node
 
     # Get the feature vector of a node by flattening the observation dictionary
     def get_node_feature_vector(self, node_id):
@@ -242,8 +278,19 @@ class CyberBattleLocalEnv(CyberBattleEnv):
         # map discrete choice to the action
         if action_index < self.num_vulnerabilities_outcomes:
             vulnerability_ID, outcome_desired = self.calculate_discrete_action(action_index)
-            self.vulnerability_type = self.current_source_node == self.current_target_node and "local" or "remote"
-            super().step_attacker_env(self.current_source_node, self.current_target_node, vulnerability_ID, outcome_desired)
+            if vulnerability_ID is None:
+                # padding slot: this topology instance's own (vulnerability, outcome) catalogue is
+                # shorter than the uniform size pad_to_uniform_size() aligned it to across the batch
+                # of topologies sharing one RandomSwitchEnv -- treat as an invalid action rather
+                # than calling step_attacker_env with no real vulnerability to exploit.
+                self.vulnerability_type = None
+                self.end_episode_reason = 0
+                self.truncated = self.done = False
+                self.reward = self.penalty_invalid_movement
+                self.outcome = model.InvalidMovement()
+            else:
+                self.vulnerability_type = self.current_source_node == self.current_target_node and "local" or "remote"
+                super().step_attacker_env(self.current_source_node, self.current_target_node, vulnerability_ID, outcome_desired)
         else:
             # switching actions
             vulnerability_ID = None
@@ -289,6 +336,10 @@ class CyberBattleLocalEnv(CyberBattleEnv):
             outcome=map_outcome_to_string(self.outcome),
             end_episode_reason=self.end_episode_reason,
         )
+
+        # dynamic node population changes; may re-pick current_source_node/current_target_node
+        # if either was just removed, so this must run before the observation is built below
+        self.maybe_apply_dynamic_step()
 
         # Compute based on current pair the observation and return
         self.observation = [0 for _ in range(2 * len(self.node_feature_vector_size))]

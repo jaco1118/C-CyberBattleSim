@@ -289,6 +289,11 @@ class AttackerAgentActions:
             newly_discovered_nodes_value = 0
 
             for node_id in outcome.nodes:
+                # a vulnerability's static Reconnaissance outcome can still reference a node that
+                # has since been dynamically removed from the topology (cyberbattle_env.py's
+                # dynamic-leave feature) -- skip it rather than KeyError on the graph lookup below
+                if node_id not in self._environment.nodes:
+                    continue
                 if self.__mark_node_as_discovered(node_id):
                     if self.verbose > 2:
                         self.logger.info("Node %s discovered", node_id)
@@ -504,6 +509,11 @@ class AttackerAgentActions:
             newly_discovered_nodes = 0
             newly_discovered_nodes_value = 0
             for node_id in outcome.nodes:
+                # a vulnerability's static Reconnaissance outcome can still reference a node that
+                # has since been dynamically removed from the topology (cyberbattle_env.py's
+                # dynamic-leave feature) -- skip it rather than KeyError on the graph lookup below
+                if node_id not in self._environment.nodes:
+                    continue
                 if self.__mark_node_as_discovered(node_id):
                     if self.verbose > 2:
                         self.logger.info("Node %s discovered", node_id)

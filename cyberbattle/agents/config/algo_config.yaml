@@ -45,18 +45,21 @@ a2c:
   ent_coef: 0.01
   vf_coef: 1.5
 ppo:
-  n_steps: 1024
-  ent_coef: 0.2
-  vf_coef: 0.5
-  learning_rate: 0.0001
-  learning_rate_type: constant
-  learning_rate_final: 0.00001
+  n_steps: 2048
+  ent_coef: 0.001
+  vf_coef: 1
+  learning_rate: 0.0002
+  learning_rate_type: linear
+  learning_rate_final: 0.00005
   batch_size: 128
-  n_epochs: 20
-  gamma: 0.9
+  n_epochs: 10
+  gamma: 0.99
   gae_lambda: 0.95
   clip_range: 0.2
+  # clip_range_type: linear
+  # clip_range_final: 0.05
   normalize_advantage: True
+  target_kl: 0.05
   max_grad_norm: 0.3
 rppo:
   n_steps: 1024
