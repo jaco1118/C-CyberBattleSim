@@ -69,6 +69,14 @@ class CyberBattleEnv(gym.Env):
                  dynamic_batch_size_mean=1.0, # mean of the Poisson term added to the guaranteed 1 when a batch event fires
                  dynamic_batch_max_fraction=0.3, # cap on batch size as a fraction of the current eligible pool
                  dynamic_degree_weighting=True, # weight per-node removal probability down for high-degree/critical nodes
+                 dynamic_max_alive_nodes=None, # absolute ceiling: dynamic join never grows alive count above this; None -> derived purely from the fraction/joins-per-episode below
+                 dynamic_max_alive_fraction=1.3, # relative ceiling: fraction of the original topology size, combined with the absolute ceiling via min()
+                 dynamic_max_joins_per_episode=3, # hard cap on total join events per episode; also the single source of truth used to size Local/Global's pre-allocated join headroom, keeping the two mutually consistent
+                 dynamic_join_rate_interval=20, # calibration anchor for join's per-parent Bernoulli rate (kept separate from change_interval, which has an unrelated meaning)
+                 dynamic_join_batch_interval=150, # mean steps between low-rate Poisson batch-join events
+                 dynamic_join_batch_size_mean=1.0, # mean of the Poisson term added to the guaranteed 1 when a batch join event fires
+                 dynamic_join_batch_max_fraction=0.3, # cap on batch size as a fraction of the current eligible parent pool
+                 dynamic_join_value_weighting=True, # weight per-parent join-sponsorship probability by ownership + node value (self.environment has no edges, so degree is not a meaningful signal here)
                  **kwargs
                  ):
         self.environment = None
@@ -104,6 +112,15 @@ class CyberBattleEnv(gym.Env):
         self.dynamic_batch_size_mean = dynamic_batch_size_mean
         self.dynamic_batch_max_fraction = dynamic_batch_max_fraction
         self.dynamic_degree_weighting = dynamic_degree_weighting
+        self.dynamic_max_alive_nodes = dynamic_max_alive_nodes
+        self.dynamic_max_alive_fraction = dynamic_max_alive_fraction
+        self.dynamic_max_joins_per_episode = dynamic_max_joins_per_episode
+        self.dynamic_join_rate_interval = dynamic_join_rate_interval
+        self.dynamic_join_batch_interval = dynamic_join_batch_interval
+        self.dynamic_join_batch_size_mean = dynamic_join_batch_size_mean
+        self.dynamic_join_batch_max_fraction = dynamic_join_batch_max_fraction
+        self.dynamic_join_value_weighting = dynamic_join_value_weighting
+        self.dynamic_join_donor_pool = []  # set externally by train_agent.py's env-building loop
         self._dynamic_change_count = 0
         self.__initial_environment: model.Model = initial_environment
         self.done = False
@@ -168,7 +185,8 @@ class CyberBattleEnv(gym.Env):
         self.num_events = 0
         self._dynamic_change_count = 0
         self._dynamic_removed_this_episode: List[model.NodeID] = []
-        self._join_noop_logged = False
+        self._dynamic_joined_this_episode: List[model.NodeID] = []
+        self._used_donor_pool_indices_this_episode: set = set()
         self._dynamic_last_applied_iteration = -1
         self.discovered_nodes: List[model.NodeID] = []
         self.owned_nodes: List[model.NodeID] = []
@@ -400,8 +418,12 @@ class CyberBattleEnv(gym.Env):
 
     # Orchestrator called once per step, unconditionally, by every subclass's step() (no modulo
     # gate at the call site -- the modulo gating for legacy patch/service changes lives inside
-    # here, and the new probabilistic leave logic has its own internal ramping/floor logic).
-    # Returns the list of node IDs actually removed this step (empty list if nothing happened).
+    # here, and the new probabilistic leave/join logic has its own internal ramping/floor-or-
+    # ceiling logic). Returns a single flat list combining node IDs removed AND joined this step
+    # (empty if neither happened) -- callers that only care "did anything change" (e.g.
+    # Compressed's re-encode trigger) can keep checking truthiness unchanged; callers that ignore
+    # the return value (Local/Global, which always rebuild their observation from live state
+    # regardless) are unaffected either way.
     def maybe_apply_dynamic_step(self) -> List["model.NodeID"]:
         if self.num_iterations == 0:
             return []
@@ -416,11 +438,12 @@ class CyberBattleEnv(gym.Env):
         if self.patch_service_dynamic_enabled and self.num_iterations % self.change_interval == 0:
             self._apply_legacy_dynamic_change()
         removed: List["model.NodeID"] = []
+        joined: List["model.NodeID"] = []
         if self.dynamic_mode in ("leave", "both"):
             removed = self._apply_dynamic_leave()
         if self.dynamic_mode in ("join", "both"):
-            self._dynamic_join_noop()
-        return removed
+            joined = self._apply_dynamic_join()
+        return removed + joined
 
     # Legacy patch/service/mixed changes: node-count invariant, unrelated to the node
     # leave/join population dynamics. Kept as-is, just no longer dispatches "node_leave".
@@ -468,6 +491,19 @@ class CyberBattleEnv(gym.Env):
     def _count_alive_topology_nodes(self) -> int:
         return len(self.environment.nodes)
 
+    # Mirror image of _get_dynamic_floor(): the maximum number of alive nodes that dynamic join
+    # may never grow past. Combines an absolute ceiling and a ceiling proportional to the original
+    # topology size via min() (the stricter of the two wins, symmetric to the floor's max()), and
+    # is additionally hard-clamped to self.num_nodes + dynamic_max_joins_per_episode so the
+    # config-driven ceiling can never imply more simultaneous joins than the headroom pre-allocated
+    # for Local/Global (by train_agent.py, using dynamic_max_joins_per_episode as the same source
+    # of truth) actually supports.
+    def _get_dynamic_ceiling(self) -> int:
+        fraction_ceiling = math.floor(self.dynamic_max_alive_fraction * self.num_nodes)
+        absolute_ceiling = self.dynamic_max_alive_nodes if self.dynamic_max_alive_nodes is not None else fraction_ceiling
+        ceiling = min(absolute_ceiling, fraction_ceiling)
+        return min(ceiling, self.num_nodes + self.dynamic_max_joins_per_episode)
+
     # Probabilistic node-leave: per-node Bernoulli draw each step (probability weighted down for
     # high-degree/critical nodes), plus a low-rate Poisson-triggered batch removal, calibrated so
     # the expected removal rate matches change_interval as a sanity anchor, and ramped down as the
@@ -500,7 +536,15 @@ class CyberBattleEnv(gym.Env):
         target_rate = ramp * (1.0 / self.change_interval)
 
         if self.dynamic_degree_weighting:
-            degrees = {n: self.environment.degree(n) for n in eligible}
+            # self.environment (the per-episode graph) never has edges -- all connectivity lives
+            # on the shared Model's precomputed access_graph. Reading (not writing) it here is
+            # safe, matching the established rule that only mutating access_graph/knows_graph/
+            # dos_graph is the aliasing hazard. A dynamically joined node (once discovered) can be
+            # leave-eligible but was never part of access_graph -- networkx's degree(n) for a node
+            # not in the graph returns an (empty) DiDegreeView instead of an int or a KeyError, so
+            # this must be guarded explicitly; degree 0 (lowest possible weighting protection) is
+            # the correct default, since a joined node has no precomputed connectivity data at all.
+            degrees = {n: (self.access_graph.degree(n) if n in self.access_graph else 0) for n in eligible}
             weights = {n: 1.0 / (1.0 + degrees[n]) for n in eligible}
         else:
             weights = {n: 1.0 for n in eligible}
@@ -541,17 +585,74 @@ class CyberBattleEnv(gym.Env):
                 )
         return hits
 
-    # Extension point for dynamic_mode="join"/"both": not implemented in this change (requires a
-    # max_nodes over-provisioning scheme and action masking for the fixed-size discrete envs to
-    # add brand-new nodes without breaking already-built SB3 policy networks). Logs once per
-    # episode so long training runs aren't silently misled about what's actually happening.
-    def _dynamic_join_noop(self):
-        if not self._join_noop_logged:
+    # Probabilistic node-join: mirror image of _apply_dynamic_leave. Per-eligible-parent Bernoulli
+    # draw each step (probability weighted by ownership + node value -- self.environment has no
+    # edges, so degree is not a meaningful signal here, unlike leave's degree weighting), plus a
+    # low-rate Poisson-triggered batch join, ramped down as the ceiling is approached, hard-capped
+    # by the remaining per-episode join budget (dynamic_max_joins_per_episode -- also the exact
+    # figure train_agent.py uses to size Local/Global's pre-allocated action-space headroom, so the
+    # runtime ceiling here can never imply more simultaneous joins than that headroom supports).
+    def _apply_dynamic_join(self) -> List["model.NodeID"]:
+        if not hasattr(self, "add_node_dynamic"):
             self.logger.warning(
-                "[DynamicEnv] dynamic_mode=%r requests node-join, which is not yet implemented "
-                "(new nodes only, no rejoin) -- no-op this episode", self.dynamic_mode
+                "[DynamicEnv] dynamic_mode=%r requires an environment implementing "
+                "add_node_dynamic; skipping join", self.dynamic_mode
             )
-            self._join_noop_logged = True
+            return []
+
+        remaining_budget = self.dynamic_max_joins_per_episode - len(self._dynamic_joined_this_episode)
+        if remaining_budget <= 0 or not self.dynamic_join_donor_pool:
+            return []
+
+        eligible_parents = self._get_join_eligible_parents()
+        if not eligible_parents:
+            return []
+
+        ceiling = self._get_dynamic_ceiling()
+        room = min(max(0, ceiling - self._count_alive_topology_nodes()), remaining_budget)
+        if room == 0:
+            return []
+
+        # soft ramp towards 0 as the ceiling is approached, mirroring leave's floor-ward ramp
+        ramp = min(1.0, room / max(1, ceiling - self.num_nodes))
+        target_rate = ramp * (1.0 / self.dynamic_join_rate_interval)
+
+        if self.dynamic_join_value_weighting:
+            weights = {
+                n: (2.0 if n in self.owned_nodes else 1.0) * (1.0 + self.get_node(n).value / 100.0)
+                for n in eligible_parents
+            }
+        else:
+            weights = {n: (2.0 if n in self.owned_nodes else 1.0) for n in eligible_parents}
+        weight_sum = sum(weights.values())
+
+        probabilities = {
+            n: min(self._DYNAMIC_P_MAX, target_rate * weights[n] / weight_sum)
+            for n in eligible_parents
+        }
+        hits = [n for n in eligible_parents if random.random() < probabilities[n]]
+
+        # low-rate Poisson "batch join" trigger, independent of the per-parent draws above
+        p_batch_trigger = ramp / self.dynamic_join_batch_interval
+        if random.random() < p_batch_trigger:
+            batch_pool = [n for n in eligible_parents if n not in hits]
+            if batch_pool:
+                batch_size = 1 + numpy.random.poisson(self.dynamic_join_batch_size_mean)
+                batch_size = min(batch_size, len(batch_pool), max(1, int(self.dynamic_join_batch_max_fraction * len(eligible_parents))))
+                batch_weights = numpy.array([weights[n] for n in batch_pool], dtype=numpy.float64)
+                batch_weights = batch_weights / batch_weights.sum()
+                batch_hits = numpy.random.choice(batch_pool, size=batch_size, replace=False, p=batch_weights)
+                hits += list(batch_hits)
+
+        if len(hits) > room:
+            hits = random.sample(hits, room)
+
+        joined = []
+        for parent in hits:
+            new_node_id = self._spawn_node_from_pool(parent)
+            if new_node_id is not None:
+                joined.append(new_node_id)
+        return joined
 
     # Shared purge logic used by every subclass's remove_node_dynamic: ground-truth graph removal,
     # discovered_nodes/owned_nodes pruning, and win-condition denominator decrement (only for the
@@ -578,6 +679,117 @@ class CyberBattleEnv(gym.Env):
             self.disruptable_count -= 1
         self._dynamic_removed_this_episode.append(node_id)
         return True
+
+    # Mirror image of remove_node_common(): shared "add" logic used by every subclass's
+    # add_node_dynamic. Only adds to self.environment (ground truth) -- deliberately NOT to
+    # discovered_nodes/owned_nodes, since a joined node starts genuinely undiscovered until
+    # _inject_reconnaissance_discovery() makes it reachable. Unconditionally increments
+    # ownable_count/discoverable_count/disruptable_count by 1: unlike remove_node_common's
+    # decrement (conditional on the node having been present in the per-episode
+    # shortest_paths_starter_* snapshot, itself deep-copied once from the shared Model's static
+    # tables), a joined node was never in that snapshot to begin with -- there is no "was it
+    # counted" bit to check. Unconditional +1 is the correct semantics: a joined node is always
+    # meant to be a genuine new objective for every goal type from the moment it exists.
+    def add_node_common(self, node_id, node_info) -> bool:
+        if node_id in self.environment.nodes():
+            return False  # should never trigger given the ID scheme in _spawn_node_from_pool; defensive only
+        self.environment.add_node(node_id, data=node_info)
+        self.ownable_count += 1
+        self.discoverable_count += 1
+        self.disruptable_count += 1
+        self._dynamic_joined_this_episode.append(node_id)
+        return True
+
+    # Nodes eligible to "sponsor" a join (i.e. have the new node attached to them via a
+    # Reconnaissance injection, see _inject_reconnaissance_discovery). Discovered-only ensures the
+    # join is actually reachable this episode -- an undiscovered parent's vulnerabilities can't be
+    # exploited by the agent yet, so the injection would be inert. Running mirrors the same filter
+    # _get_removal_eligible_nodes applies, for the same reason (a stopped node's vulnerabilities
+    # aren't currently exploitable). Unlike leave, no starter/source/target/interest exclusion is
+    # needed: appending to a Reconnaissance outcome's node list is a pure data mutation on that
+    # node's VulnerabilityInfo, not a structural removal, so it's safe even on the current step's
+    # active nodes.
+    def _get_join_eligible_parents(self):
+        return [
+            n for n in self.discovered_nodes
+            if self.get_node(n).status == model.MachineStatus.Running
+        ]
+
+    # Picks an unused-this-episode donor node from self.dynamic_join_donor_pool, renames it to a
+    # fresh, collision-free ID, strips its own Reconnaissance outcomes (they'd otherwise reference
+    # node IDs from the donor's original topology, meaningless here), adds it via add_node_dynamic
+    # (subclass-implemented, representation-specific), and wires in discoverability. Returns the
+    # new node's ID, or None if the pool is exhausted or the env doesn't support join.
+    def _spawn_node_from_pool(self, preferred_parent) -> Optional["model.NodeID"]:
+        if not hasattr(self, "add_node_dynamic"):
+            self.logger.warning(
+                "[DynamicEnv] dynamic_mode=%r requires an environment implementing "
+                "add_node_dynamic; skipping join", self.dynamic_mode
+            )
+            return None
+        available = [
+            i for i in range(len(self.dynamic_join_donor_pool))
+            if i not in self._used_donor_pool_indices_this_episode
+        ]
+        if not available:
+            return None
+        pool_index = random.choice(available)
+        self._used_donor_pool_indices_this_episode.add(pool_index)
+        donor_topology_id, donor_original_id, donor_node_info = self.dynamic_join_donor_pool[pool_index]
+
+        new_node_id = f"JoinNode_{len(self._dynamic_joined_this_episode)}_{donor_topology_id}_{donor_original_id}"
+        node_info = copy.deepcopy(donor_node_info)
+        node_info.node_id = new_node_id
+        for vuln in node_info.vulnerabilities.values():
+            for result in vuln.results:
+                if isinstance(result.outcome, model.Reconnaissance):
+                    result.outcome.nodes = []
+
+        self.add_node_dynamic(new_node_id, node_info)
+        self._inject_reconnaissance_discovery(new_node_id, preferred_parent)
+        if self.verbose > 0:
+            self.logger.info(
+                "[DynamicEnv] Step %d: joined node %s (from topology %s node %s, sponsored by %s)",
+                self.num_iterations, new_node_id, donor_topology_id, donor_original_id, preferred_parent
+            )
+        return new_node_id
+
+    # Makes a newly-joined node discoverable by appending it to an eligible parent's *existing*
+    # Reconnaissance vulnerability outcome, mirroring real discovery mechanics rather than placing
+    # the node pre-discovered. Tries the preferred (sponsoring) parent first, then falls back to
+    # any other eligible parent with a Reconnaissance vulnerability, and only synthesizes a new one
+    # if genuinely none of the eligible parents have one at all.
+    def _inject_reconnaissance_discovery(self, new_node_id, preferred_parent):
+        candidates = [preferred_parent] + [n for n in self._get_join_eligible_parents() if n != preferred_parent]
+        for parent in candidates:
+            for vuln in self.get_node(parent).vulnerabilities.values():
+                for result in vuln.results:
+                    if isinstance(result.outcome, model.Reconnaissance):
+                        result.outcome.nodes.append(new_node_id)
+                        return
+        self._synthesize_recon_vulnerability(preferred_parent, new_node_id)
+
+    # Fallback used only when no eligible parent has any Reconnaissance-outcome vulnerability at
+    # all. Reuses an existing embedding from the parent (rather than zeros) so the synthetic
+    # vulnerability isn't a systematic outlier in embedding-distance-based action selection
+    # (relevant for the compressed env's cosine-distance nearest-action matching).
+    def _synthesize_recon_vulnerability(self, parent_node_id, new_node_id):
+        parent_info = self.get_node(parent_node_id)
+        vuln_id = f"synthetic_recon_{parent_node_id}_{new_node_id}"
+        existing_embeddings = [v.embedding for v in parent_info.vulnerabilities.values() if v.embedding]
+        embedding = existing_embeddings[0] if existing_embeddings else {}
+        parent_info.vulnerabilities[vuln_id] = model.VulnerabilityInfo(
+            vulnerability_ID=vuln_id,
+            port=parent_info.services[0].name if parent_info.services else "",
+            description="Synthetic reconnaissance vulnerability (dynamic node-join fallback)",
+            results=[model.PredictedResult(
+                type=model.VulnerabilityType.LOCAL, type_str="local",
+                outcome=model.Reconnaissance([new_node_id]), outcome_str="Reconnaissance", probability=1.0
+            )],
+            embedding=embedding, cost=1.0,
+        )
+        if hasattr(self, "refresh_vulnerabilities_embeddings_for_node"):
+            self.refresh_vulnerabilities_embeddings_for_node(parent_node_id)
 
     def _patch_random_vulnerability(self):
         running_nodes = [

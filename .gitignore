@@ -2,6 +2,7 @@
 **/logs/**
 /typings/**
 **/__pycache__
+*.egg-info/
 cyberbattle/data/*
 cyberbattle/agents/logs/*
 cyberbattle/gae/logs/*

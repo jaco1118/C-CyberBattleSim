@@ -368,18 +368,10 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
             os.makedirs(os.path.join(envs_folder))
 
         config['num_environments'] = 0
-        # Only populated when environment_type == "global": CyberBattleGlobalEnv's action/observation
-        # space size depends on this specific topology's own node count and vulnerability catalogue,
-        # but RandomSwitchEnv fixes its action_space/observation_space once, from whichever topology
-        # instance loads first, and never revisits them when switching to a different instance
-        # mid-training. Every instance in the pool must therefore share one uniform, pre-computed
-        # size -- so global envs are collected here and padded/pickled in a second pass below,
-        # instead of being pickled immediately like the other two environment types.
-        global_envs_to_pad = []
-        # Same rationale as global_envs_to_pad above: CyberBattleLocalEnv's action space is
-        # node-count-invariant, but not vulnerability-catalogue-size-invariant across differently
-        # generated topologies, which can trip the same class of RandomSwitchEnv fixed-space bug.
-        local_envs_to_pad = []
+        # Pass 1: pure deserialization only, no env-wrapping yet -- every topology's raw Model must
+        # be loaded before the cross-topology donor pool (below) can be built, and before the
+        # global/local padding passes (below) can see the whole batch to size themselves against.
+        loaded_networks = []  # List[Tuple[element_id, model.Model]]
         for element in tqdm(os.listdir(original_envs_folder), desc="Loading environments from the folder"):
             if os.path.isfile(os.path.join(original_envs_folder, element)):
                 with open(os.path.join(envs_folder, element), 'wb') as f: # saving into the destination folder
@@ -394,53 +386,153 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
                     network_folder = os.path.join(original_envs_folder, element, "pca/num_components="+str(config['pca_components']) ,f"network_{config['nlp_extractor']}.pkl")
                 with open(network_folder, 'rb') as f:
                     network = pickle.load(f)
+                loaded_networks.append((element, network))
 
-                # map simple values to classes after saving the configuration file (to avoid saving the object)
-                if config['static_defender_agent']:
-                    if config['static_defender_agent']=='reimage':
-                        config['static_defender_agent'] = ScanAndReimageCompromisedMachines(random.uniform(config['detect_probability_min'], config['detect_probability_max']),
-                                                                                           random.randint(config['scan_capacity_min'], config['scan_capacity_max']),
-                                                                                           random.randint(config['scan_frequency_min'], config['scan_frequency_max']), logger=logger, verbose=config['verbose'])
-                    elif config['static_defender_agent']=='events':
-                        config['static_defender_agent'] = ExternalRandomEvents(random.uniform(config['random_event_probability_min'], config['random_event_probability_max']), logger=logger, verbose=config['verbose'])
+        # map simple values to classes after saving the configuration file (to avoid saving the
+        # object) -- done once here, outside the per-topology loop: this never depended on `network`
+        # in the first place, and previously only ever mutated config on the very first iteration
+        # anyway (comparing an already-mapped object to a string is always False on later iterations)
+        if config['static_defender_agent']:
+            if config['static_defender_agent']=='reimage':
+                config['static_defender_agent'] = ScanAndReimageCompromisedMachines(random.uniform(config['detect_probability_min'], config['detect_probability_max']),
+                                                                                   random.randint(config['scan_capacity_min'], config['scan_capacity_max']),
+                                                                                   random.randint(config['scan_frequency_min'], config['scan_frequency_max']), logger=logger, verbose=config['verbose'])
+            elif config['static_defender_agent']=='events':
+                config['static_defender_agent'] = ExternalRandomEvents(random.uniform(config['random_event_probability_min'], config['random_event_probability_max']), logger=logger, verbose=config['verbose'])
 
-                # Use the network graph environment and map it to a C-CyberBattleSim environment
-                if args.environment_type == "global":
-                    env = wrap_graphs_to_global_envs(network, logger, **config)
-                    global_envs_to_pad.append((element, env))
-                    continue
-                elif args.environment_type == "local":
-                    env = wrap_graphs_to_local_envs(network, logger, **config)
-                    local_envs_to_pad.append((element, env))
-                    continue
-                else: #if args.environment_type == "continuous":
-                    env = wrap_graphs_to_compressed_envs(network, logger, **config)
-                    env.set_graph_encoder(graph_encoder)
+        # Cross-topology donor pool for dynamic-join, built only if join dynamics are enabled. Each
+        # donor is a deep-copied NodeInfo extracted from a topology's PRISTINE Model (before any env
+        # wraps it, before any RL episode ever runs), so every donor is guaranteed undiscovered/
+        # unowned. Keyed by source topology so each destination env can be given every *other*
+        # topology's pool, excluding its own -- structurally enforcing "never borrow from self /
+        # never rejoin a node removed earlier in the same episode" (that node was never in this
+        # pool to begin with).
+        donor_pool_by_source = {}
+        if config.get('dynamic_mode') in ('join', 'both'):
+            for element, network in loaded_networks:
+                donor_pool_by_source[element] = [
+                    (element, node_id, copy.deepcopy(node_data["data"]))
+                    for node_id, node_data in network.network.nodes(data=True)
+                ]
 
-                env.set_pca_components(config['pca_components'])
+        # Only populated when environment_type == "global": CyberBattleGlobalEnv's action/observation
+        # space size depends on this specific topology's own node count and vulnerability catalogue,
+        # but RandomSwitchEnv fixes its action_space/observation_space once, from whichever topology
+        # instance loads first, and never revisits them when switching to a different instance
+        # mid-training. Every instance in the pool must therefore share one uniform, pre-computed
+        # size -- so global envs are collected here and padded/pickled in a second pass below,
+        # instead of being pickled immediately like the other two environment types.
+        global_envs_to_pad = []
+        # Same rationale as global_envs_to_pad above: CyberBattleLocalEnv's action space is
+        # node-count-invariant, but not vulnerability-catalogue-size-invariant across differently
+        # generated topologies, which can trip the same class of RandomSwitchEnv fixed-space bug.
+        local_envs_to_pad = []
+        # Compressed needs no size padding at all (its continuous action space is node-count-
+        # invariant), but still needs its donor pool attached before pickling -- collected the same
+        # way for a uniform second pass, just without any pad_to_uniform_size call.
+        continuous_envs_to_write = []
+        for element, network in loaded_networks:
+            # Use the network graph environment and map it to a C-CyberBattleSim environment
+            if args.environment_type == "global":
+                env = wrap_graphs_to_global_envs(network, logger, **config)
+                if donor_pool_by_source:
+                    env.dynamic_join_donor_pool = [
+                        entry for other_id, pool in donor_pool_by_source.items() if other_id != element for entry in pool
+                    ]
+                global_envs_to_pad.append((element, env))
+                continue
+            elif args.environment_type == "local":
+                env = wrap_graphs_to_local_envs(network, logger, **config)
+                if donor_pool_by_source:
+                    env.dynamic_join_donor_pool = [
+                        entry for other_id, pool in donor_pool_by_source.items() if other_id != element for entry in pool
+                    ]
+                local_envs_to_pad.append((element, env))
+                continue
+            else: #if args.environment_type == "continuous":
+                env = wrap_graphs_to_compressed_envs(network, logger, **config)
+                env.set_graph_encoder(graph_encoder)
+                if donor_pool_by_source:
+                    env.dynamic_join_donor_pool = [
+                        entry for other_id, pool in donor_pool_by_source.items() if other_id != element for entry in pool
+                    ]
+                continuous_envs_to_write.append((element, env))
 
-                with open(os.path.join(envs_folder, f"{element}.pkl"), 'wb') as f: # saving into the destination folder
-                    pickle.dump(env, f)
+        for element, env in continuous_envs_to_write:
+            env.set_pca_components(config['pca_components'])
+            with open(os.path.join(envs_folder, f"{element}.pkl"), 'wb') as f: # saving into the destination folder
+                pickle.dump(env, f)
 
         if global_envs_to_pad:
             max_action_space_size = max(len(env.flattened_action_space) for _, env in global_envs_to_pad)
             max_num_nodes = max(env.num_nodes for _, env in global_envs_to_pad)
+            # Global headroom is architecturally mandatory (node identity is baked into every action
+            # index). Bidirectional: reserves (existing_sources + 1 for self-exploit) x (donor's own
+            # vulnerability-outcome count) for existing nodes attacking the joined node, PLUS one full
+            # per-source-slice (T_max, the same size any original node's own source-slice would be)
+            # for the joined node acting as a source against every existing target -- for the
+            # worst-case donor/topology across the whole pool, times the per-episode join budget.
+            join_headroom = 0
+            if donor_pool_by_source:
+                all_donors = [entry for pool in donor_pool_by_source.values() for entry in pool]
+                v_max = max(
+                    (sum(len(vuln.results) for vuln in node_info.vulnerabilities.values())
+                     for _, _, node_info in all_donors),
+                    default=0
+                )
+                t_max = max(
+                    (sum(len(outcomes) for _, _, outcomes in env.vulnerability_list) for _, env in global_envs_to_pad),
+                    default=0
+                )
+                join_headroom = config['dynamic_max_joins_per_episode'] * ((max_num_nodes + 1) * v_max + t_max)
+            # The observation vector ("graph") is sized off padded_num_nodes and, unlike the action
+            # space, has no separate join_headroom_slots parameter -- it must reserve room for
+            # dynamic_max_joins_per_episode extra live nodes directly in target_num_nodes, or a
+            # topology that starts near the batch's max node count and then has nodes joined into it
+            # produces a live observation array larger than the Box shape (silent Python list growth
+            # past the declared size, surfacing later as a VecEnv broadcast ValueError).
+            padded_num_nodes = max_num_nodes + (config['dynamic_max_joins_per_episode'] if donor_pool_by_source else 0)
             if config['verbose']:
-                logger.info("Padding %d global environments to a uniform action space of %d and %d nodes",
-                            len(global_envs_to_pad), max_action_space_size, max_num_nodes)
+                logger.info("Padding %d global environments to a uniform action space of %d and %d nodes (+%d join headroom)",
+                            len(global_envs_to_pad), max_action_space_size, padded_num_nodes, join_headroom)
             for element, env in global_envs_to_pad:
-                env.pad_to_uniform_size(max_num_nodes, max_action_space_size)
+                env.pad_to_uniform_size(padded_num_nodes, max_action_space_size, join_headroom_slots=join_headroom)
                 env.set_pca_components(config['pca_components'])
                 with open(os.path.join(envs_folder, f"{element}.pkl"), 'wb') as f:
                     pickle.dump(env, f)
 
         if local_envs_to_pad:
             max_num_vulnerabilities_outcomes = max(env.num_vulnerabilities_outcomes for _, env in local_envs_to_pad)
+            # Local's action space is vulnerability-catalogue-size-dependent but node-count-invariant;
+            # cross-topology padding above only matches catalogue *length*, not *content* -- a donor's
+            # specific (vulnerability_ID, outcome) pairs may not already be representable at any
+            # index. Exact sizing: for every (destination, donor) pair in the batch, count pairs the
+            # destination doesn't already have (matched by (vulnerability_ID, outcome TYPE), since
+            # VulnerabilityOutcome subclasses don't define __eq__), take the worst case.
+            join_headroom = 0
+            if donor_pool_by_source:
+                v_max_new = 0
+                for destination_element, destination_env in local_envs_to_pad:
+                    existing = {
+                        (vuln_id, type(outcome)) for vuln_id, outcome in destination_env.flattened_action_space
+                        if vuln_id is not None
+                    }
+                    for donor_element, pool in donor_pool_by_source.items():
+                        if donor_element == destination_element:
+                            continue
+                        for _, _, donor_node_info in pool:
+                            new_pairs = sum(
+                                1 for vuln_id, vuln_info in donor_node_info.vulnerabilities.items()
+                                for result in vuln_info.results
+                                if (vuln_id, type(result.outcome)) not in existing
+                            )
+                            v_max_new = max(v_max_new, new_pairs)
+                join_headroom = config['dynamic_max_joins_per_episode'] * v_max_new
             if config['verbose']:
-                logger.info("Padding %d local environments to a uniform vulnerability/outcome catalogue of %d",
-                            len(local_envs_to_pad), max_num_vulnerabilities_outcomes)
+                logger.info("Padding %d local environments to a uniform vulnerability/outcome catalogue of %d (+%d join headroom)",
+                            len(local_envs_to_pad), max_num_vulnerabilities_outcomes, join_headroom)
             for element, env in local_envs_to_pad:
-                env.pad_to_uniform_size(max_num_vulnerabilities_outcomes)
+                env.pad_to_uniform_size(max_num_vulnerabilities_outcomes, join_headroom_slots=join_headroom)
                 env.set_pca_components(config['pca_components'])
                 with open(os.path.join(envs_folder, f"{element}.pkl"), 'wb') as f:
                     pickle.dump(env, f)

@@ -80,6 +80,16 @@ def map_outcome_to_string(outcome):
         return "MovementAnchors"
     elif isinstance(outcome, model.InvalidMovement):
         return "InvalidMovement"
+    elif isinstance(outcome, model.NoOutcome):
+        return "NoOutcome"
+    elif isinstance(outcome, model.Execution):
+        return "Execution"
+    elif isinstance(outcome, model.InvalidAction):
+        # catch-all for the raw base class, instantiated directly (not via a named subtype) at a
+        # few call sites in attacker_actions.py (e.g. "agent not installed on source node") -- must
+        # stay last among the InvalidAction-family checks so the more specific subtypes above are
+        # matched first
+        return "InvalidAction"
     else:
         return None
 
@@ -123,6 +133,14 @@ def map_string_to_outcome(outcome_string):
         return model.NoVulnerability()
     elif outcome_string == "RemoteOutcomeInLocalNode":
         return model.RemoteOutcomeInLocalNode()
+    elif outcome_string == "InvalidMovement":
+        return model.InvalidMovement()
+    elif outcome_string == "NoOutcome":
+        return model.NoOutcome()
+    elif outcome_string == "Execution":
+        return model.Execution()
+    elif outcome_string == "InvalidAction":
+        return model.InvalidAction()
     else:
         return None
 

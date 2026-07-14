@@ -84,6 +84,9 @@ class CyberBattleLocalEnv(CyberBattleEnv):
         # switching actions are:
         # 0: move to another source node randomly
         # 1: move to another target node randomly
+        # No join headroom reserved by default (single-topology use); pad_to_uniform_size() overrides both.
+        self._join_headroom_start_index = self.num_vulnerabilities_outcomes
+        self._join_slots_used_this_episode = 0
         self.penalty_movement = penalty_movement
         self.penalty_invalid_movement = penalty_invalid_movement
 
@@ -137,20 +140,34 @@ class CyberBattleLocalEnv(CyberBattleEnv):
     # topology's own catalogue and its two switching actions, silently skipping both step()
     # branches and leaving self.outcome unset. Called once per env, over the full topology set,
     # before any of them are wrapped in a RandomSwitchEnv.
-    def pad_to_uniform_size(self, target_num_vulnerabilities_outcomes):
+    # join_headroom_slots reserves a SEPARATE, stable slab of extra (None, None) entries beyond the
+    # cross-topology-uniformity padding above, exclusively for dynamic-join to write genuinely-new
+    # (vulnerability_ID, outcome) pairs into at runtime (see add_node_dynamic). Kept distinct from
+    # the cross-topology padding range (self._join_headroom_start_index marks the boundary) because
+    # a join-written slot's content must persist stably at a *known* index for the rest of that
+    # episode, whereas the cross-topology slots are never written to by this instance at all.
+    def pad_to_uniform_size(self, target_num_vulnerabilities_outcomes, join_headroom_slots=0):
         if target_num_vulnerabilities_outcomes > self.num_vulnerabilities_outcomes:
             self.flattened_action_space.extend(
                 [(None, None)] * (target_num_vulnerabilities_outcomes - self.num_vulnerabilities_outcomes)
             )
             self.num_vulnerabilities_outcomes = target_num_vulnerabilities_outcomes
-            self.action_space = spaces.Discrete(self.num_vulnerabilities_outcomes + 2)
-            if self.verbose > 1:
-                self.logger.info("Padded vulnerability/outcome catalogue to %d entries", self.num_vulnerabilities_outcomes)
+        self._join_headroom_start_index = self.num_vulnerabilities_outcomes
+        if join_headroom_slots > 0:
+            self.flattened_action_space.extend([(None, None)] * join_headroom_slots)
+            self.num_vulnerabilities_outcomes += join_headroom_slots
+        self.action_space = spaces.Discrete(self.num_vulnerabilities_outcomes + 2)
+        if self.verbose > 1:
+            self.logger.info(
+                "Padded vulnerability/outcome catalogue to %d entries (%d reserved for join)",
+                self.num_vulnerabilities_outcomes, join_headroom_slots
+            )
 
     # Reset function calling super.reset and initializing the evolving visible graph and the observation
     def reset(self, **kwargs):
         super().reset_env()
         self.reset_evolving_visible_graph()
+        self._join_slots_used_this_episode = 0
         self.observation = [0 for _ in range(2 * len(self.node_feature_vector_size))]
         self.current_source_node = self.starter_node
         self.current_target_node = self.starter_node
@@ -167,6 +184,14 @@ class CyberBattleLocalEnv(CyberBattleEnv):
             for vulnerability_ID in self.get_node(node).vulnerabilities:
                 self.vulnerabilities_embeddings[vulnerability_ID] = self.get_node(node).vulnerabilities[
                     vulnerability_ID].embedding
+
+    # Tops up vulnerabilities_embeddings for a single node whose vulnerability IDs may not already
+    # be known -- needed whenever a node's vulnerability set is introduced outside the normal
+    # one-time construction pass (a dynamically joined node, or a synthesized fallback
+    # Reconnaissance vulnerability on an existing node). Mirrors create_vulnerabilities_embeddings.
+    def refresh_vulnerabilities_embeddings_for_node(self, node_id):
+        for vulnerability_ID, vulnerability in self.get_node(node_id).vulnerabilities.items():
+            self.vulnerabilities_embeddings.setdefault(vulnerability_ID, vulnerability.embedding)
 
     # Reset the evolving visible graph to the initial state with only the starter node
     def reset_evolving_visible_graph(self):
@@ -189,6 +214,41 @@ class CyberBattleLocalEnv(CyberBattleEnv):
         if self.current_target_node == node_id:
             candidates = [n for n in self.discovered_nodes if n != node_id]
             self.current_target_node = random.choice(candidates) if candidates else self.starter_node
+
+    # Dynamically add a node (called by the base class's dynamic-join mechanism). The joined
+    # node's own (vulnerability_ID, outcome) pairs are written into this instance's *reserved* join
+    # headroom slots (see pad_to_uniform_size) -- a pair already present in the catalogue needs no
+    # new slot at all; only genuinely-new pairs consume one. If headroom runs out (more joins this
+    # episode than train_agent.py's v_max_new estimate anticipated, a graceful-degradation edge
+    # case rather than a crash), the excess pairs are simply unreachable for this joined node --
+    # logged, not fatal, since the node may still be reachable via whichever pairs did get a slot.
+    # "Already present" is checked by (vulnerability_ID, outcome TYPE), not raw outcome object --
+    # VulnerabilityOutcome subclasses don't define __eq__, so two conceptually-identical outcomes
+    # from different nodes are different objects and would never compare equal; must match the
+    # same type-based comparison train_agent.py uses to size this headroom in the first place, or
+    # actual usage could exceed the sizing estimate.
+    def add_node_dynamic(self, node_id, node_info):
+        if not self.add_node_common(node_id, node_info):
+            return
+        self.refresh_vulnerabilities_embeddings_for_node(node_id)
+        existing_pairs = {
+            (vuln_id, type(outcome)) for vuln_id, outcome in self.flattened_action_space if vuln_id is not None
+        }
+        headroom_capacity = self.num_vulnerabilities_outcomes - self._join_headroom_start_index
+        for vulnerability_ID, vulnerability in node_info.vulnerabilities.items():
+            for result in vulnerability.results:
+                key = (vulnerability_ID, type(result.outcome))
+                if key in existing_pairs:
+                    continue
+                if self._join_slots_used_this_episode >= headroom_capacity:
+                    self.logger.warning(
+                        "[DynamicEnv] Join headroom exhausted for node %s; some vulnerabilities unreachable", node_id
+                    )
+                    return
+                slot_index = self._join_headroom_start_index + self._join_slots_used_this_episode
+                self.flattened_action_space[slot_index] = (vulnerability_ID, result.outcome)
+                self._join_slots_used_this_episode += 1
+                existing_pairs.add(key)
 
     # Get the feature vector of a node by flattening the observation dictionary
     def get_node_feature_vector(self, node_id):

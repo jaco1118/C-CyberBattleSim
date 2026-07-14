@@ -93,6 +93,9 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
         # Deliberately kept separate from self.num_nodes, which anchors the dynamic-leave
         # floor/ramp calibration to this instance's real topology size and must not change.
         self.padded_num_nodes = self.num_nodes
+        # No join headroom reserved by default (single-topology use); pad_to_uniform_size() overrides both.
+        self._join_headroom_start_index = len(self.flattened_action_space)
+        self._join_slots_used_this_episode = 0
 
         # Create the observation space proportional to the number of nodes and the size of the node feature vector (graph size specific)
         self.observation_space = spaces.Dict({"graph": spaces.Box(low=-100, high=100, shape=(self.padded_num_nodes * len(self.node_feature_vector_size),), dtype=np.float64)})
@@ -130,14 +133,23 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
     # index out of range for a smaller one. Called once per env, over the full topology set, before
     # any of them are wrapped in a RandomSwitchEnv, so every instance in the pool ends up with an
     # identical, correct action_space/observation_space.
-    def pad_to_uniform_size(self, target_num_nodes, target_action_space_size):
+    # join_headroom_slots reserves a SEPARATE, stable slab of extra (None,...) entries beyond the
+    # cross-topology-uniformity padding above, exclusively for dynamic-join to write
+    # (source, new_node, vulnerability, outcome) tuples into at runtime (see add_node_dynamic).
+    # Kept distinct from the cross-topology padding range (self._join_headroom_start_index marks
+    # the boundary) for the same reason as Local's identically-named mechanism: a join-written
+    # slot's content must persist stably at a known index for the rest of that episode.
+    def pad_to_uniform_size(self, target_num_nodes, target_action_space_size, join_headroom_slots=0):
         if target_action_space_size > len(self.flattened_action_space):
             self.flattened_action_space.extend(
                 [(None, None, None, None)] * (target_action_space_size - len(self.flattened_action_space))
             )
-            self.action_space = spaces.Discrete(target_action_space_size)
             if self.verbose > 1:
                 self.logger.info("Padded action space to %d entries (was %d)", target_action_space_size, len(self.flattened_action_space))
+        self._join_headroom_start_index = len(self.flattened_action_space)
+        if join_headroom_slots > 0:
+            self.flattened_action_space.extend([(None, None, None, None)] * join_headroom_slots)
+        self.action_space = spaces.Discrete(len(self.flattened_action_space))
         # padding entries are (None, None, None, None) tuples; calculate_discrete_action() unpacks
         # them unchanged, and step()'s existing invalid-action guard already treats
         # `source_node not in self.environment.nodes` (True for None) as a stale/invalid reference,
@@ -149,8 +161,15 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
     def reset(self, **kwargs):
         super().reset_env()
         self.reset_evolving_visible_graph()
+        self._join_slots_used_this_episode = 0
         self.observation = [0 for _ in range(self.padded_num_nodes * len(self.node_feature_vector_size))]
         for index, node in enumerate(self.evolving_visible_graph.nodes):
+            if index >= self.padded_num_nodes:
+                self.logger.warning(
+                    "[DynamicEnv] Observation node headroom exhausted (padded_num_nodes=%d); "
+                    "truncating remaining discovered nodes from the observation", self.padded_num_nodes
+                )
+                break
             x = self.evolving_visible_graph.nodes[node]['x']
             self.observation[index * len(x): (index + 1) * len(x)] = x
         return {"graph": numpy.array(self.observation, dtype=numpy.float32)}
@@ -162,6 +181,14 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
             for vulnerability_ID in self.get_node(node).vulnerabilities:
                 self.vulnerabilities_embeddings[vulnerability_ID] = self.get_node(node).vulnerabilities[
                     vulnerability_ID].embedding
+
+    # Tops up vulnerabilities_embeddings for a single node whose vulnerability IDs may not already
+    # be known -- needed whenever a node's vulnerability set is introduced outside the normal
+    # one-time construction pass (a dynamically joined node, or a synthesized fallback
+    # Reconnaissance vulnerability on an existing node). Mirrors create_vulnerabilities_embeddings.
+    def refresh_vulnerabilities_embeddings_for_node(self, node_id):
+        for vulnerability_ID, vulnerability in self.get_node(node_id).vulnerabilities.items():
+            self.vulnerabilities_embeddings.setdefault(vulnerability_ID, vulnerability.embedding)
 
     # Reset the evolving visible graph, clearing it and adding the initial node
     def reset_evolving_visible_graph(self):
@@ -180,6 +207,50 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
             return
         if node_id in self.evolving_visible_graph.nodes():
             self.evolving_visible_graph.remove_node(node_id)
+
+    # Dynamically add a node (called by the base class's dynamic-join mechanism). Bidirectional:
+    # existing nodes (the original topology's own node set, from nodes_dict, plus the joined node
+    # itself for self-exploit) can attack the joined node, AND the joined node can itself act as a
+    # source against every existing target's vulnerabilities (self.vulnerability_list, the static
+    # per-target catalogue built once at construction from the pristine topology -- reused here
+    # exactly as __init__ used it to build every other node's source-slice, so a joined node's
+    # source-slice is generated identically to how an original node's would have been). Every tuple
+    # generated here is inherently new (node_id never existed in any pre-existing tuple), unlike
+    # Local where a dedup check against the existing catalogue is needed -- so every combination
+    # unconditionally consumes one reserved headroom slot. Does NOT touch evolving_visible_graph:
+    # the node starts undiscovered by design (add_node_common skips discovered_nodes too), and the
+    # existing step()-driven discovery mechanism adds it once actually found.
+    def add_node_dynamic(self, node_id, node_info):
+        if not self.add_node_common(node_id, node_info):
+            return
+        self.refresh_vulnerabilities_embeddings_for_node(node_id)
+        headroom_capacity = len(self.flattened_action_space) - self._join_headroom_start_index
+
+        def write_tuple(entry):
+            if self._join_slots_used_this_episode >= headroom_capacity:
+                self.logger.warning(
+                    "[DynamicEnv] Join headroom exhausted for node %s; some source/vulnerability "
+                    "combinations unreachable", node_id
+                )
+                return False
+            slot_index = self._join_headroom_start_index + self._join_slots_used_this_episode
+            self.flattened_action_space[slot_index] = entry
+            self._join_slots_used_this_episode += 1
+            return True
+
+        # existing nodes (+ self) attacking the joined node
+        sources = list(self.nodes_dict.keys()) + [node_id]
+        for vulnerability_ID, vulnerability in node_info.vulnerabilities.items():
+            for result in vulnerability.results:
+                for source in sources:
+                    if not write_tuple((source, node_id, vulnerability_ID, result.outcome)):
+                        return
+
+        # the joined node acting as source against every existing target's vulnerabilities
+        for target_node, vulnerability_ID, outcomes in self.vulnerability_list:
+            for outcome in outcomes:
+                if not write_tuple((node_id, target_node, vulnerability_ID, outcome)):
+                    return
 
     # Get the feature vector of a node, flattening it to a numpy array
     def get_node_feature_vector(self, node_id):
@@ -297,6 +368,12 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
             )
             self.observation = [0 for _ in range(self.padded_num_nodes * len(self.node_feature_vector_size))]
             for index, node in enumerate(self.discovered_nodes):
+                if index >= self.padded_num_nodes:
+                    self.logger.warning(
+                        "[DynamicEnv] Observation node headroom exhausted (padded_num_nodes=%d); "
+                        "truncating remaining discovered nodes from the observation", self.padded_num_nodes
+                    )
+                    break
                 x = self.evolving_visible_graph.nodes[node]['x']
                 self.observation[index * len(x): (index + 1) * len(x)] = x
             self.observation = {"graph": numpy.array(self.observation, dtype=numpy.float32)}
@@ -328,6 +405,12 @@ class CyberBattleGlobalEnv(CyberBattleEnv):
         # prepare the new observation vector
         self.observation = [0 for _ in range(self.padded_num_nodes * len(self.node_feature_vector_size))]
         for index, node in enumerate(self.discovered_nodes):
+            if index >= self.padded_num_nodes:
+                self.logger.warning(
+                    "[DynamicEnv] Observation node headroom exhausted (padded_num_nodes=%d); "
+                    "truncating remaining discovered nodes from the observation", self.padded_num_nodes
+                )
+                break
             x = self.evolving_visible_graph.nodes[node]['x']
             self.observation[index * len(x): (index + 1) * len(x)] = x
         self.observation = {"graph": numpy.array(self.observation, dtype=numpy.float32)}

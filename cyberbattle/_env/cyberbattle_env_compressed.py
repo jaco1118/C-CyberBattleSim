@@ -271,6 +271,25 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         # NOTE: the re-encode + action-space rebuild happen in step() right after the dynamic change,
         #       so the observation returned this step reflects the post-removal graph
 
+    # Dynamically add a node (called by the base class's dynamic-join mechanism). vulnerabilities_embeddings
+    # and vulnerabilities_embeddings_per_node_type are each built ONCE, at construction, from this
+    # instance's own nodes (create_vulnerabilities_embeddings/_per_node_type) -- a joined node's
+    # vulnerability IDs are near-certainly not already present, so refresh_vulnerabilities_embeddings_for_node
+    # must run before the node can ever be added to evolving_visible_graph (whenever that later
+    # happens, via normal discovery), since that path looks embeddings up with no fallback
+    # (convert_node_info_to_observation's mean_vulnerabilities_embedding pooling).
+    def add_node_dynamic(self, node_id, node_info):
+        if not self.add_node_common(node_id, node_info):
+            return
+        # Top up the embeddings dict now (cheap, no graph-visibility side effect), but deliberately
+        # do NOT add the node to evolving_visible_graph here -- it starts undiscovered by design
+        # (add_node_common intentionally skips discovered_nodes too), and update_evolving_visible_graph_after_step
+        # already adds any newly-discovered node to evolving_visible_graph generically once the
+        # agent actually finds it via the injected Reconnaissance outcome. Adding it here early
+        # would leak an undiscovered node into the whole-graph GAE embedding.
+        self.refresh_vulnerabilities_embeddings_for_node(node_id)
+        # re-encode + action-space rebuild happen in step() right after the dynamic change, same as removal
+
     # Function leveraging the graph parameter and the GAE encoder to encode the graph and gather node embeddings
     def encode(self, graph):
         # Use the GAE Encoder to encode the graph
@@ -490,10 +509,10 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             end_episode_reason=self.end_episode_reason,
             min_distance_action=distance
         )
-        nodes_removed = self.maybe_apply_dynamic_step()
-        if nodes_removed:
-            # a node was removed after the observation/action space were already built this step;
-            # re-encode and rebuild so we do not hand back a stale observation or action space
+        nodes_changed = self.maybe_apply_dynamic_step()  # removed and/or joined node IDs this step
+        if nodes_changed:
+            # a node was removed or joined after the observation/action space were already built
+            # this step; re-encode and rebuild so we do not hand back a stale observation or action space
             self.node_embeddings, self.observation = self.encode(self.evolving_visible_graph)
             self.observation = {
                 "graph_embeddings": self.observation,
@@ -690,6 +709,28 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                             "outcome": result.outcome,
                             "embedding": np.concatenate((embedding, outcome_embedding))
                     })
+
+    # Tops up vulnerabilities_embeddings and vulnerabilities_embeddings_per_node_type for a single
+    # node whose vulnerability IDs may not already be known -- needed whenever a node's vulnerability
+    # set is introduced or changed outside the normal one-time construction pass (a dynamically
+    # joined node, or a synthesized fallback Reconnaissance vulnerability on an existing node).
+    # Mirrors the per-node body of create_vulnerabilities_embeddings/_per_node_type exactly.
+    def refresh_vulnerabilities_embeddings_for_node(self, node_id):
+        node_info = self.get_node(node_id)
+        for vulnerability_ID, vulnerability in node_info.vulnerabilities.items():
+            self.vulnerabilities_embeddings.setdefault(vulnerability_ID, vulnerability.embedding)
+        self.vulnerabilities_embeddings_per_node_type[node_id] = {"local": [], "remote": []}
+        for vulnerability_ID, vulnerability in node_info.vulnerabilities.items():
+            embedding = vulnerability.embedding
+            for result in vulnerability.results:
+                outcome_embedding = self.map_outcome_to_onehot(result.type_str, result.outcome)
+                if outcome_embedding is None:
+                    continue
+                self.vulnerabilities_embeddings_per_node_type[node_id][result.type_str].append({
+                    "vulnerability_ID": vulnerability_ID,
+                    "outcome": result.outcome,
+                    "embedding": np.concatenate((embedding, outcome_embedding))
+                })
 
     def sample_random_action(self):
         return self.action_space.sample()
