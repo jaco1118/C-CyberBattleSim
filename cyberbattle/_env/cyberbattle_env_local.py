@@ -111,13 +111,15 @@ class CyberBattleLocalEnv(CyberBattleEnv):
     # Get the list of (vulnerability, outcomes) valid in the environment for all nodes
     def get_vulnerabilities_list(self):
         self.vulnerabilities_list = []
+        seen_vulnerability_ids = set()
         for node in self.get_nodes():
             node_info = self.get_node(node)
             for vulnerability in node_info.vulnerabilities:
                 outcomes = []
                 for result in node_info.vulnerabilities[vulnerability].results:
                     outcomes.append(result.outcome)
-                if vulnerability not in self.vulnerabilities_list: # avoid duplicates
+                if vulnerability not in seen_vulnerability_ids: # avoid duplicates
+                    seen_vulnerability_ids.add(vulnerability)
                     self.vulnerabilities_list.append((vulnerability, outcomes))
         # as nodes switches, use the full (vulnerability, outcome) pairs list as flattened action space
         return self.vulnerabilities_list

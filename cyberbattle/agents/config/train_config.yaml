@@ -3,7 +3,7 @@
 episode_iterations: 300 # cut-off considered regardless of K
 proportional_cutoff_coefficient: 25 # whether to use a cut-off proportional to the number of nodes (K) and of how much, or -1 if not
 winning_reward: 4000 # winning reward to add if the attacker goal is reached
-train_iterations:   2000000 # number of training iterations
+train_iterations:   1000000 # number of training iterations
 switch_interval: 50 # across the training set, in episodes
 absolute_reward: False # whether to have a reward = max(0, reward) of the original one
 losing_reward: -300 # losing reward to add if the attacker has lost
@@ -51,6 +51,7 @@ dynamic_join_batch_interval: 150 # mean steps between low-rate Poisson batch-joi
 dynamic_join_batch_size_mean: 1.0 # mean of the Poisson term added to the guaranteed 1 when a batch join event fires
 dynamic_join_batch_max_fraction: 0.3 # cap on batch size as a fraction of the current eligible parent pool
 dynamic_join_value_weighting: True # weight per-parent join-sponsorship probability by ownership + node value (self.environment has no edges, so degree is not a meaningful signal here)
+dynamic_join_donor_envs_path: "graphs_diagnostic_small_with_score_fix_2026-07-09_22-41-57" # optional: folder under data/env_samples used ONLY to source join-donor node profiles, independent of load_envs/training topologies. Empty ("") falls back to cross-topology donors from the loaded training set (requires >1 topology to fire).
 
 # Defender
 static_defender_eviction_goal: False # if True, defender will try to evict all the nodes owned from the network

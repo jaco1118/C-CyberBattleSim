@@ -122,11 +122,15 @@ def train_model(train_envs, logs_folder, config, run_id, val_envs=None, logger=N
     # Use DummyVecEnv to wrap the environments
     train_envs = DummyVecEnv([lambda: Monitor(train_envs)])
 
-    # potential normalization if specified
-    train_envs = VecNormalize(train_envs, norm_obs=config['norm_obs'], norm_reward=config['norm_reward'])
+    # potential normalization if specified -- gamma matched to the actual algorithm's
+    # discount factor, since VecNormalize's reward-scaling running variance is itself
+    # a discounted accumulator (SB3 default gamma=0.99 otherwise, regardless of what
+    # the algorithm is actually configured with)
+    vecnormalize_gamma = algorithm_config.get('gamma', 0.99)
+    train_envs = VecNormalize(train_envs, norm_obs=config['norm_obs'], norm_reward=config['norm_reward'], gamma=vecnormalize_gamma)
     if val_envs:
         val_envs = DummyVecEnv([lambda: Monitor(val_envs)])
-        val_envs = VecNormalize(val_envs, norm_obs=config['norm_obs'], norm_reward=False)
+        val_envs = VecNormalize(val_envs, norm_obs=config['norm_obs'], norm_reward=False, gamma=vecnormalize_gamma)
 
     if verbose:
         logger.info(f"Normalization of observations: {config['norm_obs']}")
@@ -347,6 +351,13 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
     if config['load_processed_envs']: # environments already processed from previous run
         if '/' not in config['load_processed_envs']:
             raise ValueError("The path of the run folder inside the logs folder should be provided!")
+        if config.get('dynamic_mode') in ('join', 'both'):
+            logger.warning(
+                "[DynamicEnv] load_processed_envs reuses environments pickled by a previous run "
+                "as-is -- their dynamic_join_donor_pool/join headroom reflect whatever that prior "
+                "run's config was, and are NOT rebuilt from the current dynamic_mode/"
+                "dynamic_join_donor_envs_path settings"
+            )
         if config['verbose']:
             logger.info("Loading processed environments from the run folder %s", config['load_processed_envs'])
         envs_folder = os.path.join(script_dir, "logs", config['load_processed_envs'], "envs")
@@ -400,20 +411,44 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
             elif config['static_defender_agent']=='events':
                 config['static_defender_agent'] = ExternalRandomEvents(random.uniform(config['random_event_probability_min'], config['random_event_probability_max']), logger=logger, verbose=config['verbose'])
 
-        # Cross-topology donor pool for dynamic-join, built only if join dynamics are enabled. Each
-        # donor is a deep-copied NodeInfo extracted from a topology's PRISTINE Model (before any env
-        # wraps it, before any RL episode ever runs), so every donor is guaranteed undiscovered/
-        # unowned. Keyed by source topology so each destination env can be given every *other*
-        # topology's pool, excluding its own -- structurally enforcing "never borrow from self /
-        # never rejoin a node removed earlier in the same episode" (that node was never in this
-        # pool to begin with).
+        # Donor pool for dynamic-join, built only if join dynamics are enabled. Each donor is a
+        # deep-copied NodeInfo extracted from a topology's PRISTINE Model (before any env wraps it,
+        # before any RL episode ever runs), so every donor is guaranteed undiscovered/unowned. Keyed
+        # by source topology so each destination env can be given every *other* topology's pool,
+        # excluding its own -- structurally enforcing "never borrow from self / never rejoin a node
+        # removed earlier in the same episode" (that node was never in this pool to begin with).
+        #
+        # Sourced either from the training set itself (default -- requires >1 topology loaded, or
+        # every donor pool collapses to empty and join silently never fires), or, if
+        # dynamic_join_donor_envs_path is set, from a separate reference folder loaded independently
+        # of the training set. The latter lets a deliberately single-topology training run (e.g. to
+        # avoid Local's cross-topology catalogue-padding dilution) still exercise real join events --
+        # donor pools are keyed by their own raw subfolder id either way, so the existing
+        # "other_id != element" exclusion below still protects against self-donation if a donor
+        # folder ever happens to share a subfolder id with the training set.
         donor_pool_by_source = {}
         if config.get('dynamic_mode') in ('join', 'both'):
-            for element, network in loaded_networks:
-                donor_pool_by_source[element] = [
-                    (element, node_id, copy.deepcopy(node_data["data"]))
-                    for node_id, node_data in network.network.nodes(data=True)
-                ]
+            donor_envs_path = config.get('dynamic_join_donor_envs_path')
+            if donor_envs_path:
+                donor_source_folder = os.path.join(script_dir, '..', 'data', 'env_samples', donor_envs_path)
+                for sub in os.listdir(donor_source_folder):
+                    if os.path.isdir(os.path.join(donor_source_folder, sub)) and sub.isdigit():
+                        if config['pca_components'] == 768:
+                            donor_network_file = os.path.join(donor_source_folder, sub, f"network_{config['nlp_extractor']}.pkl")
+                        else:
+                            donor_network_file = os.path.join(donor_source_folder, sub, "pca/num_components="+str(config['pca_components']), f"network_{config['nlp_extractor']}.pkl")
+                        with open(donor_network_file, 'rb') as f:
+                            donor_network = pickle.load(f)
+                        donor_pool_by_source[sub] = [
+                            (sub, node_id, copy.deepcopy(node_data["data"]))
+                            for node_id, node_data in donor_network.network.nodes(data=True)
+                        ]
+            else:
+                for element, network in loaded_networks:
+                    donor_pool_by_source[element] = [
+                        (element, node_id, copy.deepcopy(node_data["data"]))
+                        for node_id, node_data in network.network.nodes(data=True)
+                    ]
 
         # Only populated when environment_type == "global": CyberBattleGlobalEnv's action/observation
         # space size depends on this specific topology's own node count and vulnerability catalogue,
@@ -439,6 +474,12 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
                     env.dynamic_join_donor_pool = [
                         entry for other_id, pool in donor_pool_by_source.items() if other_id != element for entry in pool
                     ]
+                    if not env.dynamic_join_donor_pool:
+                        logger.warning(
+                            "[DynamicEnv] Environment %s has an empty dynamic_join_donor_pool after exclusions "
+                            "(dynamic_mode=%r) -- join will never fire for it; check load_envs / "
+                            "dynamic_join_donor_envs_path", element, config.get('dynamic_mode')
+                        )
                 global_envs_to_pad.append((element, env))
                 continue
             elif args.environment_type == "local":
@@ -447,6 +488,12 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
                     env.dynamic_join_donor_pool = [
                         entry for other_id, pool in donor_pool_by_source.items() if other_id != element for entry in pool
                     ]
+                    if not env.dynamic_join_donor_pool:
+                        logger.warning(
+                            "[DynamicEnv] Environment %s has an empty dynamic_join_donor_pool after exclusions "
+                            "(dynamic_mode=%r) -- join will never fire for it; check load_envs / "
+                            "dynamic_join_donor_envs_path", element, config.get('dynamic_mode')
+                        )
                 local_envs_to_pad.append((element, env))
                 continue
             else: #if args.environment_type == "continuous":
@@ -456,6 +503,12 @@ def setup_train_via_args(args, logs_folder=None, envs_folder=None):
                     env.dynamic_join_donor_pool = [
                         entry for other_id, pool in donor_pool_by_source.items() if other_id != element for entry in pool
                     ]
+                    if not env.dynamic_join_donor_pool:
+                        logger.warning(
+                            "[DynamicEnv] Environment %s has an empty dynamic_join_donor_pool after exclusions "
+                            "(dynamic_mode=%r) -- join will never fire for it; check load_envs / "
+                            "dynamic_join_donor_envs_path", element, config.get('dynamic_mode')
+                        )
                 continuous_envs_to_write.append((element, env))
 
         for element, env in continuous_envs_to_write:

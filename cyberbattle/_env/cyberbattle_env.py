@@ -62,7 +62,7 @@ class CyberBattleEnv(gym.Env):
                                       # also still the literal period for legacy patch/service changes
                  change_type="patch", # legacy patch/service change_type: "patch" | "service" | "mixed"
                  patch_service_dynamic_enabled=True, # enables the legacy patch/service/mixed changes (unrelated to node leave/join)
-                 dynamic_mode="none", # node population dynamics: "none" | "leave" | "join" | "both" ("join" is a scaffolded no-op for now)
+                 dynamic_mode="none", # node population dynamics: "none" | "leave" | "join" | "both"
                  dynamic_min_alive_nodes=5, # absolute floor: dynamic leave never drops alive node count below this
                  dynamic_min_alive_fraction=0.5, # relative floor: fraction of the original topology size, combined with the absolute floor via max()
                  dynamic_batch_interval=150, # mean steps between low-rate Poisson "batch outage" events
