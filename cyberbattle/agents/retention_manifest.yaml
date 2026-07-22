@@ -1,0 +1,40 @@
+metric: root_owned_nodes_percentage
+
+conditions:
+  local_dynamic:
+    representation: local
+    churn: dynamic
+    seeds:
+      42: logs/local_10-15_dynamic_single_trpo_matched_2026-07-17_02-11-45/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*.csv
+      100: logs/local_dynamic_5seed_*/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*.csv
+      123: logs/local_dynamic_5seed_*/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2/average_performances_*.csv
+      200: logs/local_dynamic_5seed_*/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3/average_performances_*.csv
+      300: logs/local_dynamic_5seed_*/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*.csv
+  local_static:
+    representation: local
+    churn: static
+    seeds:
+      42: logs/local_10-15_static_single_trpo_matched_2026-07-17_17-40-29/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*.csv
+      100: logs/local_static_5seed_*/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*.csv
+      123: logs/local_static_5seed_*/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2/average_performances_*.csv
+      200: logs/local_static_5seed_*/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3/average_performances_*.csv
+      300: logs/local_static_5seed_*/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*.csv
+  compressed_dynamic:
+    representation: compressed
+    churn: dynamic
+    seeds:
+      42: logs/compressed_10-15_dynamic_single_trpo_matched_2026-07-17_17-11-52/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*.csv
+      100: logs/compressed_dynamic_5seed_*/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*.csv
+      123: logs/compressed_dynamic_5seed_*/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2/average_performances_*.csv
+      200: logs/compressed_dynamic_5seed_*/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3/average_performances_*.csv
+      300: logs/compressed_dynamic_5seed_*/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*.csv
+  compressed_static:
+    representation: compressed
+    churn: static
+    seeds:
+      42: logs/compressed_10-15_static_single_trpo_matched_2026-07-17_17-40-29/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*.csv
+      100: logs/compressed_static_5seed_*/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*.csv
+      123: logs/compressed_static_5seed_*/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2/average_performances_*.csv
+      200: logs/compressed_static_5seed_*/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3/average_performances_*.csv
+      300: logs/compressed_static_5seed_*/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*.csv
+

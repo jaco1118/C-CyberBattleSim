@@ -75,7 +75,7 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                  edge_feature_aggregations = None, # which aggregation(s) to use for the edge embeddings in the graph, determine also the dimension of the edge embeddings
                  graph_embeddings_aggregations = None, # which aggregation(s) to use for the node embeddings in the graph, determine also the dimension of the node embeddings
                  node_embeddings_dimensions=64, # dimension of the node embeddings, determined by the GAE Encoder output size
-                 outcome_dimensions=9,  # number of possible outcomes
+                 outcome_dimensions=10,  # number of possible outcomes
                  discrete_features=None, # additional features to be added to the observation space
                  # whether PCA reduction has been performed on the vulnerability embeddings during graph generation
                  pca_components=768,
@@ -620,12 +620,21 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             # overwrite if changed
             self.action_embeddings[action_key] = np.concatenate((source_node_embedding, target_node_embedding, vulnerability['embedding']))
 
-    # Keep a susbet of actions per type in the action space for distance computation issues as approximated solution, trying to keep the balance between the different outcomes
+    # Keep a susbet of actions per type in the action space for distance computation issues as approximated solution, trying to keep the balance between the different outcomes.
+    # Grouped by map_outcome_to_string's display categories (mechanism-level: e.g. "LateralMove-Credential"
+    # combines the CredentialAccess and LateralMove classes) rather than by raw type(outcome) -- balancing
+    # per raw class previously gave any goal-relevant mechanism spanning N outcome classes up to N times
+    # sample_subset_samples's worth of slots (e.g. PrivilegeEscalation, a single class, capped at 100,
+    # vs LateralMove-Credential's two underlying classes each independently capped at 100, i.e. up to
+    # 200 combined) purely as an artifact of how many raw outcome classes happen to share that display
+    # label, with no relation to the reward function or the underlying vulnerability catalogue. This
+    # structural 2:1 ceiling was confirmed as the dominant driver of Compressed's low privilege-escalation
+    # completion rate relative to Local (which has no such per-class multiplication at all).
     def __balance_action_space_by_outcome(self):
         outcome_counts = defaultdict(list)
         for action_key in self.action_embeddings:
             outcome = action_key[-1]
-            outcome_counts[type(outcome)].append(action_key)
+            outcome_counts[map_outcome_to_string(outcome)].append(action_key)
         reduced_embeddings = {}
         for outcome, actions in outcome_counts.items():
             if len(actions) > self.sample_subset_samples:
@@ -665,21 +674,35 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
 
     # Function to map the outcome to a one-hot encoding based on its type and vulnerability type
     def map_outcome_to_onehot(self, vulnerability_type, outcome):
-        labels = {
+        # Single canonical ordering shared between "local" and "remote" so the same outcome type
+        # always maps to the same one-hot index regardless of which exploit mechanism produced it
+        # (keeps e.g. local-triggered and remote-triggered PrivilegeEscalation embeddings
+        # consistent in outcome-encoding space, rather than looking like different categories).
+        # "remote"'s membership list previously excluded PrivilegeEscalation entirely, even though
+        # attacker_actions.py's remote-exploit handler already supports and correctly gates it on
+        # prior target ownership (NoEnoughPrivilege if not already partially owned) -- identical to
+        # the local-exploit path, and identical to how CyberBattleLocalEnv's flat catalogue already
+        # includes remote-type PrivilegeEscalation vulnerabilities with no restriction. Confirmed via
+        # direct inspection this silently dropped ~95% of this topology's PrivilegeEscalation-outcome
+        # vulnerabilities (58 of 61 are remote-type) from ever reaching the action space at all.
+        canonical_labels = [DenialOfService, Discovery, Collection, Exfiltration,
+                             Reconnaissance, DefenseEvasion, Persistence,
+                             PrivilegeEscalation, CredentialAccess, LateralMove]
+        valid_labels = {
             "local": [DenialOfService, Discovery, Collection, Exfiltration,
                       Reconnaissance, DefenseEvasion, Persistence,
                       PrivilegeEscalation],
             "remote": [DenialOfService, Discovery, Collection, Exfiltration,
                        Reconnaissance, DefenseEvasion, Persistence,
-                       CredentialAccess, LateralMove]
+                       CredentialAccess, LateralMove, PrivilegeEscalation]
         }
         if isinstance(outcome, model.Execution):
             return None
-        if vulnerability_type not in labels:
+        if vulnerability_type not in valid_labels:
             raise ValueError("Vulnerability type must be either 'local' or 'remote'.")
-        if type(outcome) not in labels[vulnerability_type]:
+        if type(outcome) not in valid_labels[vulnerability_type]:
             return None
-        index = labels[vulnerability_type].index(type(outcome))
+        index = canonical_labels.index(type(outcome))
         one_hot = [0] * self.outcome_dimensions
         one_hot[index] = 1
         return one_hot

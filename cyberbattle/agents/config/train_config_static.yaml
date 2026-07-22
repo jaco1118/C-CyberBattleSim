@@ -32,7 +32,7 @@ remove_all_obstacles: True # whether to remove all obstacles (e.g. DOS actions f
 default_vulnerability_embeddings_size: 768
 
 # Dynamic environment (node population changes)
-dynamic_mode: both # none | leave | join | both
+dynamic_mode: none # none | leave | join | both
 change_interval: 20 # calibration anchor: 1/change_interval is the expected steady-state removal probability per step at full ramp
 dynamic_min_alive_nodes: 5 # absolute floor: dynamic leave never drops alive node count below this
 dynamic_min_alive_fraction: 0.5 # relative floor: fraction of the original topology size, combined with the absolute floor via max()

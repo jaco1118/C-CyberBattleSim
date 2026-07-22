@@ -33,8 +33,17 @@ def clean_checkpoints(base_dir):
                             lambda x: int(re.search(r"(\d+)_steps", x).group(1))
                         )
                         if largest_checkpoint:
+                            # Preserve the VecNormalize snapshot matching the kept checkpoint's step count
+                            # (checkpoint_vecnormalize_<N>_steps.pkl, saved by CheckpointCallback's
+                            # save_vecnormalize=True) -- without this, comparing by exact filename against
+                            # only the model .zip deletes the vecnormalize file too (different filename,
+                            # never equal), silently breaking that checkpoint's evaluability via test_agent.py
+                            # (observations would be normalized with fresh/default stats instead of the
+                            # ones the policy actually trained under).
+                            step_match = re.search(r"(\d+)_steps", largest_checkpoint)
+                            largest_vecnormalize = f"checkpoint_vecnormalize_{step_match.group(1)}_steps.pkl" if step_match else None
                             for file in os.listdir(checkpoint_path):
-                                if file != largest_checkpoint:
+                                if file != largest_checkpoint and file != largest_vecnormalize:
                                     os.remove(os.path.join(checkpoint_path, file))
                                     print(f"Removed: {os.path.join(checkpoint_path, file)}")
 

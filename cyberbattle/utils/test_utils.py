@@ -83,12 +83,14 @@ def calculate_average_performances(model, gym_env, proportional_cutoff_coefficie
     agent_discovered_amount_list = []
     agent_disrupted_list = []
     agent_won_list = []
+    agent_root_owned_list = []
     random_agent_owned_list = []
     random_agent_discovered_list = []
     random_agent_availability_list = []
     random_agent_discovered_amount_list = []
     random_agent_disrupted_list = []
     random_agent_won_list = []
+    random_agent_root_owned_list = []
 
     stats_data = []
 
@@ -104,12 +106,13 @@ def calculate_average_performances(model, gym_env, proportional_cutoff_coefficie
 
         # Play random actions to calculate random agent performance
         if not avoid_random:
-            random_agent_percentage_owned, random_agent_percentage_discovered, random_agent_network_availability, random_agent_discovered_amount, random_agent_disrupted, random_agent_won = play_random_agent_episode_until_done(gym_env)
+            random_agent_percentage_owned, random_agent_percentage_discovered, random_agent_network_availability, random_agent_discovered_amount, random_agent_disrupted, random_agent_won, random_agent_root_owned = play_random_agent_episode_until_done(gym_env)
 
             stats_data.append({
                 'episode': episode,
                 'agent': 'random',
                 'owned_nodes_percentage': random_agent_percentage_owned,
+                'root_owned_nodes_percentage': random_agent_root_owned,
                 'discovered_nodes_percentage': random_agent_percentage_discovered,
                 'network_availability': random_agent_network_availability,
                 'discovered_amount_percentage': random_agent_discovered_amount,
@@ -123,12 +126,13 @@ def calculate_average_performances(model, gym_env, proportional_cutoff_coefficie
             random_agent_discovered_amount_list.append(random_agent_discovered_amount)
             random_agent_disrupted_list.append(random_agent_disrupted)
             random_agent_won_list.append(random_agent_won)
+            random_agent_root_owned_list.append(random_agent_root_owned)
 
         if model in heuristic_models.values():
-            agent_percentage_owned, agent_percentage_discovered, agent_network_availability, agent_discovered_amount, agent_disrupted, agent_won = play_heuristic_episode_until_done(
+            agent_percentage_owned, agent_percentage_discovered, agent_network_availability, agent_discovered_amount, agent_disrupted, agent_won, agent_root_owned = play_heuristic_episode_until_done(
                 gym_env, model,score_name)
         else:
-            agent_percentage_owned, agent_percentage_discovered, agent_network_availability, agent_discovered_amount, agent_disrupted, agent_won = play_agent_episode_until_done(
+            agent_percentage_owned, agent_percentage_discovered, agent_network_availability, agent_discovered_amount, agent_disrupted, agent_won, agent_root_owned = play_agent_episode_until_done(
                 gym_env, model)
 
         episode_list.append(episode)
@@ -138,11 +142,13 @@ def calculate_average_performances(model, gym_env, proportional_cutoff_coefficie
         agent_discovered_amount_list.append(agent_discovered_amount)
         agent_disrupted_list.append(agent_disrupted)
         agent_won_list.append(agent_won)
+        agent_root_owned_list.append(agent_root_owned)
 
         stats_data.append({
             'episode': episode,
             'agent': 'agent',
             'owned_nodes_percentage': agent_percentage_owned,
+            'root_owned_nodes_percentage': agent_root_owned,
             'discovered_nodes_percentage': agent_percentage_discovered,
             'network_availability': agent_network_availability,
             'discovered_amount_percentage': agent_discovered_amount,
@@ -150,9 +156,10 @@ def calculate_average_performances(model, gym_env, proportional_cutoff_coefficie
             'episodes_won': agent_won
         })
 
-    df = pd.DataFrame(stats_data, columns=['episode', 'agent', 'owned_nodes_percentage', 'discovered_nodes_percentage', 'network_availability', 'discovered_amount_percentage', 'disrupted_nodes_percentage', 'episodes_won'])
+    df = pd.DataFrame(stats_data, columns=['episode', 'agent', 'owned_nodes_percentage', 'root_owned_nodes_percentage', 'discovered_nodes_percentage', 'network_availability', 'discovered_amount_percentage', 'disrupted_nodes_percentage', 'episodes_won'])
     return (df, agent_owned_list, agent_discovered_list, agent_availability_list, agent_discovered_amount_list, agent_disrupted_list, agent_won_list,
-            random_agent_owned_list, random_agent_discovered_list, random_agent_availability_list, random_agent_discovered_amount_list, random_agent_disrupted_list, random_agent_won_list)
+            random_agent_owned_list, random_agent_discovered_list, random_agent_availability_list, random_agent_discovered_amount_list, random_agent_disrupted_list, random_agent_won_list,
+            agent_root_owned_list, random_agent_root_owned_list)
 
 # Function to create only random agent statistics
 def calculate_random_agent_average_performances(envs, proportional_cutoff_coefficient, logger, num_episodes=100, verbose=1):
@@ -178,7 +185,7 @@ def calculate_random_agent_average_performances(envs, proportional_cutoff_coeffi
             next_state, _, done, _, _ = envs.step(action)
             if done:
                 break
-        owned_nodes, discovered_nodes, _, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, _, _, discovered_amount, discoverable_amount, episode_won = envs.get_statistics()
+        owned_nodes, discovered_nodes, _, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, _, _, discovered_amount, discoverable_amount, episode_won, _ = envs.get_statistics()
         episode_list.append(episode)
         random_agent_owned_list.append((owned_nodes / (reachable_count+1)))
         random_agent_discovered_list.append((discovered_nodes / (discoverable_count+1)))
@@ -225,8 +232,8 @@ def play_random_agent_episode_until_done(env):
         next_state, _, done, _ = env.step([action])
         if done:
             break
-    owned_nodes, discovered_nodes, _, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, _, _, discovered_amount, discoverable_amount, episode_won = env.envs[0].get_statistics()
-    return owned_nodes / (reachable_count + 1), discovered_nodes / (discoverable_count + 1), network_availability, discovered_amount / (discoverable_amount + 1), disrupted_nodes / (disruptable_count + 1), episode_won
+    owned_nodes, discovered_nodes, _, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, _, _, discovered_amount, discoverable_amount, episode_won, root_owned_nodes = env.envs[0].get_statistics()
+    return owned_nodes / (reachable_count + 1), discovered_nodes / (discoverable_count + 1), network_availability, discovered_amount / (discoverable_amount + 1), disrupted_nodes / (disruptable_count + 1), episode_won, root_owned_nodes / max(reachable_count, 1)
 
 # One episode of the agent
 def play_agent_episode_until_done(env, model):
@@ -239,9 +246,9 @@ def play_agent_episode_until_done(env, model):
         if done:
             break
 
-    owned_nodes, discovered_nodes, _, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, _, _, discovered_amount, discoverable_amount, episode_won = \
+    owned_nodes, discovered_nodes, _, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, _, _, discovered_amount, discoverable_amount, episode_won, root_owned_nodes = \
     env.envs[0].get_statistics()
-    return owned_nodes / (reachable_count + 1), discovered_nodes / (discoverable_count + 1), network_availability, discovered_amount / (discoverable_amount + 1), disrupted_nodes / (disruptable_count + 1), episode_won
+    return owned_nodes / (reachable_count + 1), discovered_nodes / (discoverable_count + 1), network_availability, discovered_amount / (discoverable_amount + 1), disrupted_nodes / (disruptable_count + 1), episode_won, root_owned_nodes / max(reachable_count, 1)
 
 def play_heuristic_episode_until_done(env, model, score_name=None):
     used_vulnerabilities = defaultdict(set)
@@ -252,9 +259,9 @@ def play_heuristic_episode_until_done(env, model, score_name=None):
         env.envs[0].step_attacker_env(source_node, target_node, vulnerability, outcome)
         if env.envs[0].done or env.envs[0].truncated:
             break
-    owned_nodes, discovered_nodes, _, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, _, _, discovered_amount, discoverable_amount, episode_won = \
+    owned_nodes, discovered_nodes, _, disrupted_nodes, num_nodes, reachable_count, discoverable_count, disruptable_count, network_availability, _, _, discovered_amount, discoverable_amount, episode_won, root_owned_nodes = \
     env.envs[0].get_statistics()
-    return owned_nodes / (reachable_count + 1), discovered_nodes / (discoverable_count + 1), network_availability, discovered_amount / (discoverable_amount + 1), disrupted_nodes / (disruptable_count + 1), episode_won
+    return owned_nodes / (reachable_count + 1), discovered_nodes / (discoverable_count + 1), network_availability, discovered_amount / (discoverable_amount + 1), disrupted_nodes / (disruptable_count + 1), episode_won, root_owned_nodes / max(reachable_count, 1)
 
 
 # Run the agent for a number of episodes (used to generate trajectories)
@@ -275,6 +282,7 @@ def play_agent_multiple_episodes_until_done(env, model, proportional_cutoff_coef
 # Overall print and save of the indicators of the performance metrics
 def print_save_performance_metrics(dict, checkpoint_short_name, logs_folder, logger, num_episodes=100, proportional_cutoff_coefficient=10, current_time="", verbose=1):
     average_owned_percentage, lower_bound_owned_percentage, upper_bound_owned_percentage = bootstrap_ci(dict['Owned nodes percentage'])
+    average_root_owned_percentage, lower_bound_root_owned_percentage, upper_bound_root_owned_percentage = bootstrap_ci(dict['Root owned nodes percentage'])
     average_discovered_percentage, lower_bound_discovered_percentage, upper_bound_discovered_percentage = bootstrap_ci(dict['Discovered nodes percentage'])
     average_network_availability, lower_bound_network_availability, upper_bound_network_availability = bootstrap_ci(dict['Network availability'])
     average_discovered_amount_percentage, lower_bound_discovered_amount_percentage, upper_bound_discovered_amount_percentage = bootstrap_ci(dict['Discovered amount percentage'])
@@ -290,6 +298,7 @@ def print_save_performance_metrics(dict, checkpoint_short_name, logs_folder, log
         logger.info("--------------------")
         logger.info(f"Checkpoint {checkpoint_short_name}:")
         logger.info(f"Average owned percentage: {average_owned_percentage} [{lower_bound_owned_percentage}, {upper_bound_owned_percentage}]")
+        logger.info(f"Average root owned percentage: {average_root_owned_percentage} [{lower_bound_root_owned_percentage}, {upper_bound_root_owned_percentage}]")
         logger.info(f"Average discovered percentage: {average_discovered_percentage} [{lower_bound_discovered_percentage}, {upper_bound_discovered_percentage}]")
         logger.info(f"Average network availability: {average_network_availability} [{lower_bound_network_availability}, {upper_bound_network_availability}]")
         logger.info(f"Average discovered amount percentage: {average_discovered_amount_percentage} [{lower_bound_discovered_amount_percentage}, {upper_bound_discovered_amount_percentage}]")
@@ -305,6 +314,7 @@ def print_save_performance_metrics(dict, checkpoint_short_name, logs_folder, log
     with open(os.path.join(logs_folder, f"average_performances_{checkpoint_short_name}_{proportional_cutoff_coefficient}_{num_episodes}_{current_time}.txt"), 'w') as file:
         file.write(f"Checkpoint {checkpoint_short_name}:\n")
         file.write(f"Average owned percentage: {average_owned_percentage} [{lower_bound_owned_percentage}, {upper_bound_owned_percentage}]\n")
+        file.write(f"Average root owned percentage: {average_root_owned_percentage} [{lower_bound_root_owned_percentage}, {upper_bound_root_owned_percentage}]\n")
         file.write(f"Average discovered percentage: {average_discovered_percentage} [{lower_bound_discovered_percentage}, {upper_bound_discovered_percentage}]\n")
         file.write(f"Average network availability: {average_network_availability} [{lower_bound_network_availability}, {upper_bound_network_availability}]\n")
         file.write(f"Average discovered amount percentage: {average_discovered_amount_percentage} [{lower_bound_discovered_amount_percentage}, {upper_bound_discovered_amount_percentage}]\n")

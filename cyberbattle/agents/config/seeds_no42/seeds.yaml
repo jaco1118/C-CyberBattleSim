@@ -1,0 +1,11 @@
+# Seeds for the 4-seed retention-analysis batch, deliberately excluding 42
+# (the seed already used by the existing single-topology matched runs, which
+# are folded in separately as a 5th seed during retention analysis).
+# Order matters: train_agent.py takes the first `num_runs` entries in file
+# order, so run_id 1 -> 100, run_id 2 -> 123, run_id 3 -> 200, run_id 4 -> 300.
+
+seeds:
+  - 100
+  - 123
+  - 200
+  - 300

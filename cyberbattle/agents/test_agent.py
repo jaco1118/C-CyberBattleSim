@@ -62,11 +62,24 @@ def parse_option(config, envs, logger, verbose):
         # Load the proper checkpoint file(s)
         checkpoint_files = [file for file in os.listdir(
             os.path.join(config['run_folder'], checkpoints_folder, str(config['run_id']))) if
-                            file.startswith("checkpoint_")]
+                            file.startswith("checkpoint_") and "vecnormalize" not in file]
 
         episode_pattern = re.compile(r'checkpoint_(-?\d+)')
 
         checkpoint_files.sort(key=lambda x: int(episode_pattern.search(x).group(1)))
+
+        # Optional stride-based subsampling across the full checkpoint history, used together
+        # with --last_checkpoint omitted to trace test-time performance across training without
+        # evaluating every single saved checkpoint (there can be hundreds). Always keeps the
+        # final checkpoint even if the stride doesn't land on it exactly, so a stride-sampled
+        # curve still ends at the same point a single-checkpoint deterministic evaluation would.
+        stride = config.get('checkpoint_stride', 1)
+        if stride and stride > 1 and len(checkpoint_files) > 1:
+            strided = checkpoint_files[::stride]
+            if checkpoint_files[-1] not in strided:
+                strided.append(checkpoint_files[-1])
+            checkpoint_files = strided
+
         checkpoints = []
 
         # Case of a single checkpoint: the last one
@@ -112,6 +125,18 @@ def parse_option(config, envs, logger, verbose):
             model = algorithm_models[config['algorithm']].load(checkpoint_path)
             if verbose:
                 logger.info("Focusing on the checkpoint: %s", checkpoint_path)
+            # Restore the training-time VecNormalize running statistics for this checkpoint's step count --
+            # without this, observations at test time are normalized with fresh/default statistics instead
+            # of the ones the policy was actually trained under, which can collapse performance entirely
+            # even when evaluating on the exact topology the model trained on.
+            vecnormalize_path = checkpoint_path.replace("checkpoint_", "checkpoint_vecnormalize_", 1).rsplit(".", 1)[0] + ".pkl"
+            if hasattr(envs, "obs_rms") and os.path.exists(vecnormalize_path):
+                loaded_vecnormalize = VecNormalize.load(vecnormalize_path, envs.venv)
+                envs.obs_rms = loaded_vecnormalize.obs_rms
+                if verbose:
+                    logger.info("Loaded VecNormalize statistics from: %s", vecnormalize_path)
+            elif hasattr(envs, "obs_rms") and verbose:
+                logger.warning("No VecNormalize statistics found at %s -- evaluating with fresh normalization statistics, results may not reflect true trained performance", vecnormalize_path)
             # Action distribution case
             if config['option'] == "actions_distribution":
                 vulnerabilities_chosen, vulnerabilities_types_chosen, outcomes_chosen = run_and_save_action_choices(model, envs, config['proportional_cutoff_coefficient'],
@@ -156,7 +181,8 @@ def parse_option(config, envs, logger, verbose):
             # Average performance case
             elif config['option'] == "agent_performances":
                 (df,  agent_owned_list, agent_discovered_list, agent_availability_list, agent_discovered_amount_list, agent_disrupted_list, agent_won_list,
-                 random_agent_owned_list, random_agent_discovered_list, random_agent_availability_list, random_agent_discovered_amount_list, random_agent_disrupted_list, random_agent_won_list) = calculate_average_performances(
+                 random_agent_owned_list, random_agent_discovered_list, random_agent_availability_list, random_agent_discovered_amount_list, random_agent_disrupted_list, random_agent_won_list,
+                 agent_root_owned_list, random_agent_root_owned_list) = calculate_average_performances(
                     model, envs,  config['proportional_cutoff_coefficient'], num_episodes=config['num_episodes_per_checkpoint'], avoid_random=config['no_random'], logger=logger, verbose=verbose)
 
                 save_folder = os.path.join(config['run_folder'], test_folder, str(config['run_id']))
@@ -180,12 +206,14 @@ def parse_option(config, envs, logger, verbose):
                     df.to_csv(os.path.join(save_folder, f"average_performances_{checkpoint_short_name}_{config['proportional_cutoff_coefficient']}_{config['num_episodes_per_checkpoint']}_{defender_parameter}_{current_time}.csv"),
                               index=False)
                 outcomes[checkpoint_short_name] = {"Owned nodes percentage": agent_owned_list,
+                                                       "Root owned nodes percentage": agent_root_owned_list,
                                                        "Discovered nodes percentage": agent_discovered_list,
                                                        "Network availability": agent_availability_list,
                                                        "Discovered amount percentage": agent_discovered_amount_list,
                                                        "Disrupted nodes percentage": agent_disrupted_list,
                                                        "Episodes won": agent_won_list,
                                                        "Random - Owned nodes percentage": random_agent_owned_list,
+                                                       "Random - Root owned nodes percentage": random_agent_root_owned_list,
                                                        "Random - Discovered nodes percentage": random_agent_discovered_list,
                                                        "Random - Network availability": random_agent_availability_list,
                                                        "Random - Discovered amount percentage": random_agent_discovered_amount_list,
@@ -194,12 +222,14 @@ def parse_option(config, envs, logger, verbose):
                                                        }
                 if checkpoint_short_name not in all_outcomes:
                     all_outcomes[checkpoint_short_name] = {"Owned nodes percentage": agent_owned_list,
+                                                   "Root owned nodes percentage": agent_root_owned_list,
                                                    "Discovered nodes percentage": agent_discovered_list,
                                                    "Network availability": agent_availability_list,
                                                     "Discovered amount percentage": agent_discovered_amount_list,
                                                     "Disrupted nodes percentage": agent_disrupted_list,
                                                     "Episodes won": agent_won_list,
                                                    "Random - Owned nodes percentage": random_agent_owned_list,
+                                                   "Random - Root owned nodes percentage": random_agent_root_owned_list,
                                                    "Random - Discovered nodes percentage": random_agent_discovered_list,
                                                    "Random - Network availability": random_agent_availability_list,
                                                    "Random - Discovered amount percentage": random_agent_discovered_amount_list,
@@ -208,12 +238,14 @@ def parse_option(config, envs, logger, verbose):
                                                    }
                 else:
                     all_outcomes[checkpoint_short_name]["Owned nodes percentage"].extend(agent_owned_list)
+                    all_outcomes[checkpoint_short_name]["Root owned nodes percentage"].extend(agent_root_owned_list)
                     all_outcomes[checkpoint_short_name]["Discovered nodes percentage"].extend(agent_discovered_list)
                     all_outcomes[checkpoint_short_name]["Network availability"].extend(agent_availability_list)
                     all_outcomes[checkpoint_short_name]["Discovered amount percentage"].extend(agent_discovered_amount_list)
                     all_outcomes[checkpoint_short_name]["Disrupted nodes percentage"].extend(agent_disrupted_list)
                     all_outcomes[checkpoint_short_name]["Episodes won"].extend(agent_won_list)
                     all_outcomes[checkpoint_short_name]["Random - Owned nodes percentage"].extend(random_agent_owned_list)
+                    all_outcomes[checkpoint_short_name]["Random - Root owned nodes percentage"].extend(random_agent_root_owned_list)
                     all_outcomes[checkpoint_short_name]["Random - Discovered nodes percentage"].extend(random_agent_discovered_list)
                     all_outcomes[checkpoint_short_name]["Random - Network availability"].extend(random_agent_availability_list)
                     all_outcomes[checkpoint_short_name]["Random - Discovered amount percentage"].extend(random_agent_discovered_amount_list)
@@ -302,6 +334,34 @@ def load_test_envs(run_folder, args, train_config, test_config, logger=None, sta
         tmp_folder = os.path.join("tmp", datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
         if not os.path.exists(tmp_folder):
             os.makedirs(tmp_folder)
+
+        # Donor pool for dynamic-join, mirroring train_agent.py's setup_train_via_args exactly --
+        # without this (and the pad_to_uniform_size call below), test envs are built with a raw,
+        # un-padded action space that's SMALLER than what the model was actually trained with
+        # (training reserves join-headroom slots on top of the base catalogue whenever
+        # dynamic_join_donor_envs_path is set), causing a silent action-space size mismatch between
+        # the loaded model and the test environment -- confirmed via direct comparison: training
+        # logged Action space: Discrete(304), the un-padded test env only reaches Discrete(272).
+        donor_pool_by_source = {}
+        if train_config.get('dynamic_mode') in ('join', 'both'):
+            donor_envs_path = train_config.get('dynamic_join_donor_envs_path')
+            if donor_envs_path:
+                donor_source_folder = os.path.join(script_dir, '..', 'data', 'env_samples', donor_envs_path)
+                for sub in os.listdir(donor_source_folder):
+                    if os.path.isdir(os.path.join(donor_source_folder, sub)) and sub.isdigit():
+                        if train_config['pca_components'] == 768:
+                            donor_network_file = os.path.join(donor_source_folder, sub, f"network_{train_config['nlp_extractor']}.pkl")
+                        else:
+                            donor_network_file = os.path.join(donor_source_folder, sub, "pca/num_components="+str(train_config['pca_components']), f"network_{train_config['nlp_extractor']}.pkl")
+                        with open(donor_network_file, 'rb') as f:
+                            donor_network = pickle.load(f)
+                        donor_pool_by_source[sub] = [
+                            (sub, node_id, copy.deepcopy(node_data["data"]))
+                            for node_id, node_data in donor_network.network.nodes(data=True)
+                        ]
+
+        local_envs_to_pad = []
+        global_envs_to_pad = []
         for folder in tqdm(os.listdir(original_envs_folder), desc="Loading environments..."):
             if os.path.isdir(os.path.join(str(original_envs_folder), folder)) and folder.isdigit() and folder in test_ids:
                 if train_config['pca_components'] == 768:
@@ -314,15 +374,84 @@ def load_test_envs(run_folder, args, train_config, test_config, logger=None, sta
                 train_config.pop('verbose', None)
                 if args.environment_type == 'global':
                     env = wrap_graphs_to_global_envs(network, logger=logger, verbose=args.verbose, **train_config)
+                    if donor_pool_by_source:
+                        env.dynamic_join_donor_pool = [
+                            entry for other_id, pool in donor_pool_by_source.items() if other_id != folder for entry in pool
+                        ]
+                    global_envs_to_pad.append((folder, env))
+                    continue
                 elif args.environment_type == "local":
                     env = wrap_graphs_to_local_envs(network, logger, **train_config)
+                    if donor_pool_by_source:
+                        env.dynamic_join_donor_pool = [
+                            entry for other_id, pool in donor_pool_by_source.items() if other_id != folder for entry in pool
+                        ]
+                    local_envs_to_pad.append((folder, env))
+                    continue
                 else: #if args.environment_type == "continuous":
                     env = wrap_graphs_to_compressed_envs(network, logger, **train_config)
                     env.set_graph_encoder(graph_encoder)
                     env.set_pca_components(train_config['pca_components'])
                     env.set_graph_encoder(graph_encoder)
+                    if donor_pool_by_source:
+                        env.dynamic_join_donor_pool = [
+                            entry for other_id, pool in donor_pool_by_source.items() if other_id != folder for entry in pool
+                        ]
                 with open(os.path.join(tmp_folder, f"{folder}.pkl"), 'wb') as f:
                      pickle.dump(env, f)
+
+        if local_envs_to_pad:
+            max_num_vulnerabilities_outcomes = max(env.num_vulnerabilities_outcomes for _, env in local_envs_to_pad)
+            # Mirrors train_agent.py's exact join_headroom sizing: worst-case count of donor
+            # (vulnerability_ID, outcome TYPE) pairs not already representable at any index.
+            join_headroom = 0
+            if donor_pool_by_source:
+                v_max_new = 0
+                for destination_element, destination_env in local_envs_to_pad:
+                    existing = {
+                        (vuln_id, type(outcome)) for vuln_id, outcome in destination_env.flattened_action_space
+                        if vuln_id is not None
+                    }
+                    for donor_element, pool in donor_pool_by_source.items():
+                        if donor_element == destination_element:
+                            continue
+                        for _, _, donor_node_info in pool:
+                            new_pairs = sum(
+                                1 for vuln_id, vuln_info in donor_node_info.vulnerabilities.items()
+                                for result in vuln_info.results
+                                if (vuln_id, type(result.outcome)) not in existing
+                            )
+                            v_max_new = max(v_max_new, new_pairs)
+                join_headroom = train_config['dynamic_max_joins_per_episode'] * v_max_new
+            if args.verbose:
+                logger.info("Padding %d local test environments to a uniform vulnerability/outcome catalogue of %d (+%d join headroom)",
+                            len(local_envs_to_pad), max_num_vulnerabilities_outcomes, join_headroom)
+            for element, env in local_envs_to_pad:
+                env.pad_to_uniform_size(max_num_vulnerabilities_outcomes, join_headroom_slots=join_headroom)
+                with open(os.path.join(tmp_folder, f"{element}.pkl"), 'wb') as f:
+                    pickle.dump(env, f)
+
+        if global_envs_to_pad:
+            max_action_space_size = max(len(env.flattened_action_space) for _, env in global_envs_to_pad)
+            max_num_nodes = max(env.num_nodes for _, env in global_envs_to_pad)
+            join_headroom = 0
+            if donor_pool_by_source:
+                v_max = max(
+                    (sum(len(vuln.results) for vuln in node_info.vulnerabilities.values())
+                     for pool in donor_pool_by_source.values() for _, _, node_info in pool),
+                    default=0
+                )
+                t_max = max((len(env.flattened_action_space) for _, env in global_envs_to_pad), default=0)
+                join_headroom = train_config['dynamic_max_joins_per_episode'] * ((max_num_nodes + 1) * v_max + t_max)
+            padded_num_nodes = max_num_nodes + (train_config['dynamic_max_joins_per_episode'] if donor_pool_by_source else 0)
+            if args.verbose:
+                logger.info("Padding %d global test environments to a uniform action space of %d and %d nodes (+%d join headroom)",
+                            len(global_envs_to_pad), max_action_space_size, padded_num_nodes, join_headroom)
+            for element, env in global_envs_to_pad:
+                env.pad_to_uniform_size(padded_num_nodes, max_action_space_size, join_headroom_slots=join_headroom)
+                with open(os.path.join(tmp_folder, f"{element}.pkl"), 'wb') as f:
+                    pickle.dump(env, f)
+
         envs_folder = tmp_folder
     test_ids = [x for x in test_ids if f"{x}.pkl" in os.listdir(envs_folder)]
     if args.verbose:
@@ -359,6 +488,7 @@ def main():
                         help='Path of the folder where the seeds.yaml should be loaded from (e.g. previous experiment)')
     parser.add_argument('--random_seed', action='store_true', default=False, help='Use random seeds for training')
     parser.add_argument('--last_checkpoint', default=False, action="store_true", help='Load the last checkpoint only (best for validation or last for training)')
+    parser.add_argument('--checkpoint_stride', type=int, default=1, help='When --last_checkpoint is not set, evaluate every Nth checkpoint instead of all of them (default: 1, evaluate every checkpoint)')
     parser.add_argument('--val_checkpoints', default=False, action="store_true",
                         help='Use validation checkpoints instead of training checkpoints')
     parser.add_argument('--option', default='actions_distribution', choices=['random_agent_performances', 'actions_distribution', 'agent_performances', 'save_trajectories'], help='Decide which statistics to plot')

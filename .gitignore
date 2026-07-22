@@ -9,6 +9,14 @@ cyberbattle/gae/logs/*
 cyberbattle/models/*
 cyberbattle/visualization/logs/*
 
+# Job/SLURM output logs and scratch run output - large, not source
+*.out
+cyberbattle/agents/tmp/
+cyberbattle/agents/torch
+
+# Claude Code's own session directory - not project source
+.claude/
+
 # Secrets - never commit API keys/credentials
 cyberbattle/data_generation/config/auth.yaml
 **/auth.yaml
@@ -17,3 +25,4 @@ cyberbattle/data_generation/config/auth.yaml
 # Dissertation work log - local drafting aid only, not for version control
 # (see the header note in the file itself for why)
 dissertation_log.md
+dissertation_log_v2.md
