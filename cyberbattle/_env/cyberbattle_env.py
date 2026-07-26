@@ -188,6 +188,12 @@ class CyberBattleEnv(gym.Env):
         self._dynamic_joined_this_episode: List[model.NodeID] = []
         self._used_donor_pool_indices_this_episode: set = set()
         self._dynamic_last_applied_iteration = -1
+        # Diagnostic-only (drift instrumentation): events fired by the most recent
+        # maybe_apply_dynamic_step() call, as [{"change_type": "property"|"membership_leave"|
+        # "membership_join", "node_ids": [...]}, ...]. Populated regardless of drift_logging
+        # (cheap bookkeeping) so StepInfo['change_type'] is always accurate; only consumed
+        # further by subclasses that implement drift logging.
+        self._last_dynamic_events: List[dict] = []
         self.discovered_nodes: List[model.NodeID] = []
         self.owned_nodes: List[model.NodeID] = []
         self.episode_rewards: List[float] = []
@@ -425,6 +431,10 @@ class CyberBattleEnv(gym.Env):
     # the return value (Local/Global, which always rebuild their observation from live state
     # regardless) are unaffected either way.
     def maybe_apply_dynamic_step(self) -> List["model.NodeID"]:
+        # Reset every call (not just on the early-return branches below) so a caller reading
+        # self._last_dynamic_events after this returns never sees a stale event from a prior
+        # iteration that this call itself did nothing on.
+        self._last_dynamic_events = []
         if self.num_iterations == 0:
             return []
         # Local/Global "switch"/invalid-action paths don't call step_attacker_env, so
@@ -441,24 +451,31 @@ class CyberBattleEnv(gym.Env):
         joined: List["model.NodeID"] = []
         if self.dynamic_mode in ("leave", "both"):
             removed = self._apply_dynamic_leave()
+            if removed:
+                self._last_dynamic_events.append({"change_type": "membership_leave", "node_ids": list(removed)})
         if self.dynamic_mode in ("join", "both"):
             joined = self._apply_dynamic_join()
+            if joined:
+                self._last_dynamic_events.append({"change_type": "membership_join", "node_ids": list(joined)})
         return removed + joined
 
     # Legacy patch/service/mixed changes: node-count invariant, unrelated to the node
     # leave/join population dynamics. Kept as-is, just no longer dispatches "node_leave".
     def _apply_legacy_dynamic_change(self):
         self._dynamic_change_count += 1
+        touched_node = None
         if self.change_type == "patch":
-            self._patch_random_vulnerability()
+            touched_node = self._patch_random_vulnerability()
         elif self.change_type == "service":
-            self._disable_random_service()
+            touched_node = self._disable_random_service()
         elif self.change_type == "mixed":
             # alternate between the two
             if self._dynamic_change_count % 2 == 0:
-                self._patch_random_vulnerability()
+                touched_node = self._patch_random_vulnerability()
             else:
-                self._disable_random_service()
+                touched_node = self._disable_random_service()
+        if touched_node is not None:
+            self._last_dynamic_events.append({"change_type": "property", "node_ids": [touched_node]})
 
     # Nodes eligible to be dynamically removed: discovered, running, and not one of the
     # currently-protected roles (starter/source/target/interest node).
@@ -791,13 +808,13 @@ class CyberBattleEnv(gym.Env):
         if hasattr(self, "refresh_vulnerabilities_embeddings_for_node"):
             self.refresh_vulnerabilities_embeddings_for_node(parent_node_id)
 
-    def _patch_random_vulnerability(self):
+    def _patch_random_vulnerability(self) -> Optional["model.NodeID"]:
         running_nodes = [
             node for node in self.discovered_nodes
             if self.get_node(node).status == model.MachineStatus.Running
         ]
         if not running_nodes:
-            return
+            return None
         node_id = random.choice(running_nodes)
         node_info = self.get_node(node_id)
         if node_info.vulnerabilities:
@@ -807,14 +824,16 @@ class CyberBattleEnv(gym.Env):
                 "[DynamicEnv] Step %d: Patched vuln '%s' on node %s",
                 self.num_iterations, vuln_id, node_id
             )
+            return node_id
+        return None
 
-    def _disable_random_service(self):
+    def _disable_random_service(self) -> Optional["model.NodeID"]:
         running_nodes = [
             node for node in self.discovered_nodes
             if self.get_node(node).status == model.MachineStatus.Running
         ]
         if not running_nodes:
-            return
+            return None
         node_id = random.choice(running_nodes)
         node_info = self.get_node(node_id)
         active_services = [s for s in node_info.services if s.running]
@@ -825,6 +844,8 @@ class CyberBattleEnv(gym.Env):
                 "[DynamicEnv] Step %d: Disabled service '%s' on node %s",
                 self.num_iterations, service.name, node_id
             )
+            return node_id
+        return None
 
     # Function to update the environment data structures based on the outcome of the action taken
     def update_episode_by_outcome(self, outcome, target_node):
