@@ -763,6 +763,7 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         action_referenced_removed_entity=None, agent_action_succeeded=None,
         connectivity_event_fired=False, connectivity_n_touched_nodes=0,
         episode_override=None, step_override=None,
+        norm_h1_slices=None, norm_h2_slices=None, norm_h3_slices=None,
     ):
         aggs = self.graph_embeddings_aggregations
         row = {
@@ -790,6 +791,14 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             row[f"agent_drift_{agg}"] = agent_drift_slices[agg] if agent_drift_slices else None
             row[f"change_drift_{agg}"] = change_drift_slices[agg] if change_drift_slices else None
             row[f"attenuation_ratio_{agg}"] = attenuation_ratio_slices[agg] if attenuation_ratio_slices else None
+        # Per-slice absolute norms (STEP 2): appended last, snapshot-major, so absolute drift
+        # (norm_h1_s minus norm_h2_s is NOT the right derivation -- see note below) is
+        # reconstructable per slice, not just for "full". Derivation for downstream analysis:
+        # abs_drift(s) = rel_drift(s) * norm_h1_s (never norm_h2_s - norm_h1_s, which is the
+        # difference of two vector magnitudes, not the magnitude of their difference).
+        for snapshot_label, slices_dict in (("h1", norm_h1_slices), ("h2", norm_h2_slices), ("h3", norm_h3_slices)):
+            for agg in aggs:
+                row[f"norm_{snapshot_label}_{agg}"] = slices_dict[agg] if slices_dict else None
         return row
 
     def _log_drift_rows(self, h1, h2, h3, dynamic_events, connectivity_event,
@@ -801,6 +810,9 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         change_drift_slices = {agg: self._rel_drift(h2.slices[agg], h3.slices[agg]) for agg in aggs}
         norm_h1, norm_h2, norm_h3 = (float(np.linalg.norm(h1.combined)), float(np.linalg.norm(h2.combined)),
                                      float(np.linalg.norm(h3.combined)))
+        norm_h1_slices = {agg: float(np.linalg.norm(h1.slices[agg])) for agg in aggs}
+        norm_h2_slices = {agg: float(np.linalg.norm(h2.slices[agg])) for agg in aggs}
+        norm_h3_slices = {agg: float(np.linalg.norm(h3.slices[agg])) for agg in aggs}
 
         events = dynamic_events or [None]  # None -> the "no dynamic change" sanity-check row
         for event in events:
@@ -854,6 +866,7 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 agent_action_succeeded=agent_action_succeeded,
                 connectivity_event_fired=connectivity_event is not None,
                 connectivity_n_touched_nodes=len(connectivity_event["node_ids"]) if connectivity_event else 0,
+                norm_h1_slices=norm_h1_slices, norm_h2_slices=norm_h2_slices, norm_h3_slices=norm_h3_slices,
             )
             self._drift_logger.log(row)
 
@@ -869,6 +882,8 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         agent_drift_full = self._rel_drift(h1.combined, h2.combined)
         agent_drift_slices = {agg: self._rel_drift(h1.slices[agg], h2.slices[agg]) for agg in aggs}
         norm_h1, norm_h2 = float(np.linalg.norm(h1.combined)), float(np.linalg.norm(h2.combined))
+        norm_h1_slices = {agg: float(np.linalg.norm(h1.slices[agg])) for agg in aggs}
+        norm_h2_slices = {agg: float(np.linalg.norm(h2.slices[agg])) for agg in aggs}
         delta_h_G_full = h2.combined - h1.combined
 
         pending_by_node = {}
@@ -908,6 +923,7 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 attenuation_ratio_slices=attenuation_ratio_slices,
                 action_referenced_removed_entity=action_referenced_removed_entity,
                 agent_action_succeeded=agent_action_succeeded,
+                norm_h1_slices=norm_h1_slices, norm_h2_slices=norm_h2_slices,
             )
             self._drift_logger.log(row)
 

@@ -79,6 +79,15 @@ class DriftLogger:
             "pooling_mode",
             "connectivity_event_fired", "connectivity_n_touched_nodes",
         ]
+        # Per-slice ABSOLUTE norms (Phase 1 follow-up): appended at the very end so every
+        # existing column keeps its position. Without these, absolute drift is only
+        # reconstructable for the "full" slice (norm_h2 * change_drift_full) -- mean/max/min have
+        # no per-slice norm anywhere, so absolute per-slice drift is not recoverable at all without
+        # them. Snapshot-major order (all of h1, then all of h2, then all of h3), named from the
+        # aggregation list for the same forward-compat reason as the per-slice columns above.
+        for snapshot_label in ("h1", "h2", "h3"):
+            for agg in aggregation_names:
+                self.columns.append(f"norm_{snapshot_label}_{agg}")
         if csv_path:
             directory = os.path.dirname(csv_path)
             if directory:
