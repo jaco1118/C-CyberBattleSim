@@ -3,26 +3,45 @@
 # condition, since RQ2/RQ3's scale question is regressed against n_discovered within band,
 # not compared across a seeds dict the way the retention scripts are.
 #
-# PROVISIONAL: all three bands share the confounded cross-band join_donor_pool_20_topologies
-# donor pool (431 vs 192 novel donor/topology pairs across bands -- see dissertation_log_v2.md).
-# These numbers are a directional gate read only, not thesis-ready, until same-band donor pools
-# (a separate, not-yet-started follow-up) are used to retrain and re-evaluate.
+# AMENDMENT (task T v2 + amendment 1): re-pointed at the new TRPO grid (5 seeds x 3 bands,
+# Compressed-only, 250k steps, 8 topologies per band -- see grid_topology_id_map.json).
+# Replaces the single-seed PPO checkpoints this gate originally used. run_folder (singular)
+# is now run_folders (list of 5, one per seed); compute_attenuation_analysis.py loops over
+# all 5 per band, tagging every row with its seed, and reports between-seed variance.
+#
+# PROVISIONAL: shared confounded donor pool, approx 2.2x weaker at the large band;
+# membership change type only; property change disabled.
 
 target_relevant_events_per_change_type: 200
-max_episodes_per_band: 400          # sane episode budget cap -- report shortfall rather than hang
+max_episodes_per_band: 400          # per SEED now (5 seeds/band => up to 2000 episodes/band)
 switch_interval_episodes: 5         # topologies within a band are cycled every N episodes
 n_topologies_per_band: 8            # sampled from each band's own topology pool (not all 100 -- runtime)
 
 bands:
   10-15:
-    run_folder: "logs/[useless but backup] compressed_scale_10_15_2026-07-18_05-25-49/PPO_x_control_SecureBERT"
+    run_folders:
+      - "logs/trpo_250k_tuned_compressed_band10-15_seed42_2026-07-26_11-56-51/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band10-15_seed100_2026-07-26_12-06-37/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band10-15_seed123_2026-07-26_12-16-24/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band10-15_seed200_2026-07-26_12-25-43/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band10-15_seed300_2026-07-26_12-35-30/TRPO_x_control_SecureBERT"
     topology_source_folder: scalability_10_15   # under cyberbattle/data/env_samples/
     checkpoint_glob: checkpoints/1/checkpoint_*_steps.zip
   30-40:
-    run_folder: "logs/[useless but backup] compressed_scale_30_40_2026-07-18_05-25-49/PPO_x_control_SecureBERT"
+    run_folders:
+      - "logs/trpo_250k_tuned_compressed_band30-40_seed42_2026-07-26_12-47-19/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band30-40_seed100_2026-07-26_13-04-57/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band30-40_seed123_2026-07-26_13-21-32/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band30-40_seed200_2026-07-26_13-38-29/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band30-40_seed300_2026-07-26_13-55-49/TRPO_x_control_SecureBERT"
     topology_source_folder: scalability_30_40
     checkpoint_glob: checkpoints/1/checkpoint_*_steps.zip
   80-100:
-    run_folder: "logs/[useless but backup] compressed_scale_80_100_2026-07-18_05-25-49/PPO_x_control_SecureBERT"
+    run_folders:
+      - "logs/trpo_250k_tuned_compressed_band80-100_seed42_2026-07-26_14-47-54/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band80-100_seed100_2026-07-26_14-47-54/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band80-100_seed123_2026-07-26_14-47-54/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band80-100_seed200_2026-07-26_14-47-54/TRPO_x_control_SecureBERT"
+      - "logs/trpo_250k_tuned_compressed_band80-100_seed300_2026-07-26_14-47-54/TRPO_x_control_SecureBERT"
     topology_source_folder: scalability_80_100
     checkpoint_glob: checkpoints/1/checkpoint_*_steps.zip

@@ -88,7 +88,7 @@ def load_band_model_and_encoder(run_folder):
 
 
 def build_band_envs(train_config, graph_encoder, topology_source_folder, n_topologies, logger,
-                     drift_log_path, band_label):
+                     drift_log_path, band_label, seed):
     from cyberbattle._env.cyberbattle_env_compressed import CyberBattleCompressedEnv
 
     topo_folder = os.path.join(project_root, "cyberbattle", "data", "env_samples", topology_source_folder)
@@ -121,7 +121,7 @@ def build_band_envs(train_config, graph_encoder, topology_source_folder, n_topol
         env = CyberBattleCompressedEnv(
             initial_environment=network, logger=logger, verbose=0,
             drift_logging=True, drift_log_path=drift_log_path, drift_sample_rate=1,
-            drift_run_id=f"{band_label}_checkpoint1", drift_seed=42, drift_scenario_id=folder,
+            drift_run_id=f"{band_label}_seed{seed}", drift_seed=seed, drift_scenario_id=folder,
             **{k: v for k, v in train_config_for_env.items()
                if k not in ('drift_logging', 'drift_log_path', 'drift_sample_rate',
                              'drift_run_id', 'drift_seed', 'drift_scenario_id')}
@@ -136,18 +136,74 @@ def build_band_envs(train_config, graph_encoder, topology_source_folder, n_topol
 
 
 def collect_band_data(band_label, band_config, manifest, logger):
-    run_folder = os.path.join(script_dir, band_config['run_folder'])
-    train_config, graph_encoder, model, checkpoint_path, vecnormalize_path = load_band_model_and_encoder(run_folder)
+    """AMENDMENT (task T v2 + amendment 1): loops over band_config['run_folders'] (one per
+    seed, 5 for this grid) rather than a single run_folder, writing all seeds' episodes into
+    the SAME per-band drift CSV (reset once, before the loop, not per seed) so downstream
+    analysis sees one band-level file with a populated 'seed' column per row -- exactly what
+    compute_episode_aggregates/compute_response_rates now group on (in addition to
+    scenario_id/episode) to avoid silently merging same-numbered episodes from different
+    seeds' independent runs."""
     drift_log_path = os.path.join(DRIFT_LOG_DIR, f"drift_{band_label}.csv")
     os.makedirs(DRIFT_LOG_DIR, exist_ok=True)
     if os.path.exists(drift_log_path):
         os.remove(drift_log_path)
 
+    run_folders = band_config['run_folders']
+    combined_final_counts = Counter()
+    combined_shortfall = {}
+    combined_skip_info = {
+        "n_episodes_completed": 0, "n_episodes_skipped": 0,
+        "n_episodes_attempted": 0, "skip_reason_counts": Counter(),
+    }
+    per_seed_skip_info = {}
+    per_seed_shortfall = {}
+    n_seeds_run = 0
+
+    for run_folder_rel in run_folders:
+        run_folder = os.path.join(script_dir, run_folder_rel)
+        train_config, graph_encoder, model, checkpoint_path, vecnormalize_path = load_band_model_and_encoder(run_folder)
+        seed = train_config['seeds_runs'][0]
+        final_counts, shortfall, n_episodes_completed, skip_info = _collect_one_seed(
+            band_label, band_config, manifest, logger, train_config, graph_encoder, model,
+            checkpoint_path, vecnormalize_path, drift_log_path, seed,
+        )
+        n_seeds_run += 1
+        per_seed_skip_info[seed] = skip_info
+        per_seed_shortfall[seed] = shortfall  # a seed-level shortfall must stay visible per seed,
+        # not just diluted into a pooled total -- one struggling seed among five should not be
+        # masked by the other four's surplus.
+        for ct, c in final_counts.items():
+            combined_final_counts[ct] += c
+        for ct, s in shortfall.items():
+            existing = combined_shortfall.setdefault(ct, {"count": 0, "target": s["target"], "shortfall": 0, "reason": s["reason"]})
+            existing["count"] += s["count"]
+        combined_skip_info["n_episodes_completed"] += skip_info["n_episodes_completed"]
+        combined_skip_info["n_episodes_skipped"] += skip_info["n_episodes_skipped"]
+        combined_skip_info["n_episodes_attempted"] += skip_info["n_episodes_attempted"]
+        combined_skip_info["skip_reason_counts"].update(skip_info["skip_reason_counts"])
+
+    combined_skip_info["skip_reason_counts"] = dict(combined_skip_info["skip_reason_counts"])
+    combined_skip_info["per_seed"] = per_seed_skip_info
+    # Recompute shortfall's "shortfall" field against n_seeds_run * target (the pooled total
+    # expected if every seed alone had hit the per-seed stopping target) -- comparing the pooled
+    # count against a single seed's target would trivially show "no shortfall" once 5 seeds are
+    # summed, even if one seed individually fell far short.
+    for ct, s in combined_shortfall.items():
+        s["target"] = s["target"] * n_seeds_run
+        s["shortfall"] = max(0, s["target"] - s["count"])
+    combined_shortfall = {ct: s for ct, s in combined_shortfall.items() if s["shortfall"] > 0}
+    combined_shortfall["_per_seed"] = per_seed_shortfall
+
+    return drift_log_path, dict(combined_final_counts), combined_shortfall, combined_skip_info["n_episodes_completed"], combined_skip_info
+
+
+def _collect_one_seed(band_label, band_config, manifest, logger, train_config, graph_encoder,
+                       model, checkpoint_path, vecnormalize_path, drift_log_path, seed):
     envs, topology_ids = build_band_envs(
         train_config, graph_encoder, band_config['topology_source_folder'],
-        manifest['n_topologies_per_band'], logger, drift_log_path, band_label
+        manifest['n_topologies_per_band'], logger, drift_log_path, band_label, seed
     )
-    print(f"[{band_label}] loaded checkpoint {os.path.basename(checkpoint_path)}, "
+    print(f"[{band_label} seed={seed}] loaded checkpoint {os.path.basename(checkpoint_path)}, "
           f"{len(envs)} topologies from {band_config['topology_source_folder']}")
 
     switch_env = RandomSwitchEnv(
@@ -187,14 +243,20 @@ def collect_band_data(band_label, band_config, manifest, logger):
     def relevant_counts():
         # Cheap incremental check: count relevant, filtered (touched_node_visible + phase) rows
         # per change_type directly from whichever underlying envs' in-memory logger, since we
-        # write straight to disk (drift_log_path shared across all envs in this band) -- read
-        # back the file itself, which is flushed per DriftLogger.flush_every (200) rows. For a
-        # responsive stopping check we flush all envs explicitly here (cheap, I/O only).
+        # write straight to disk (drift_log_path shared ACROSS ALL 5 SEEDS in this band now --
+        # see collect_band_data amendment) -- read back the file itself, which is flushed per
+        # DriftLogger.flush_every (200) rows. For a responsive stopping check we flush all envs
+        # explicitly here (cheap, I/O only). MUST filter to this seed's own rows: since the file
+        # now accumulates across seeds sequentially, an unfiltered count would already exceed
+        # target from a PRIOR seed's rows the moment seed 2+ starts, stopping it almost
+        # immediately after its first checked episode -- confirmed as the actual failure mode
+        # before this filter was added.
         for env in envs:
             env._drift_logger.flush()
         if not os.path.exists(drift_log_path):
             return {ct: 0 for ct in change_types_of_interest}
         df = pd.read_csv(drift_log_path)
+        df = df[df['seed'] == seed]
         counts = {}
         for ct in change_types_of_interest:
             mask = (
@@ -238,9 +300,9 @@ def collect_band_data(band_label, band_config, manifest, logger):
             n_episodes_completed += 1
             if n_episodes_completed % 10 == 0:
                 counts = relevant_counts()
-                print(f"[{band_label}] episode {n_episodes_completed}: relevant-event counts so far {counts}")
+                print(f"[{band_label} seed={seed}] episode {n_episodes_completed}: relevant-event counts so far {counts}")
                 if all(counts.get(ct, 0) >= target for ct in stopping_change_types):
-                    print(f"[{band_label}] target of {target} relevant events per change type reached "
+                    print(f"[{band_label} seed={seed}] target of {target} relevant events per change type reached "
                           f"after {n_episodes_completed} completed episodes "
                           f"(excluding structurally impossible {structurally_impossible or 'none'})")
                     break
@@ -258,22 +320,22 @@ def collect_band_data(band_label, band_config, manifest, logger):
         }
         for ct in change_types_of_interest if max(0, target - final_counts.get(ct, 0)) > 0
     }
-    print(f"[{band_label}] data collection finished: {n_episodes_completed} completed episodes, "
+    print(f"[{band_label} seed={seed}] data collection finished: {n_episodes_completed} completed episodes, "
           f"{n_episodes_skipped} SKIPPED episodes ({dict(skip_reason_counts)}), "
           f"final relevant-event counts: {final_counts}")
     if n_episodes_skipped:
-        print(f"[{band_label}] *** {n_episodes_skipped} episode(s) skipped -- see B1 caveat: skipped "
+        print(f"[{band_label} seed={seed}] *** {n_episodes_skipped} episode(s) skipped -- see B1 caveat: skipped "
               f"episodes may be systematically biased toward longer/larger-discovered-set episodes, "
               f"which would bias the sample against the large-n_discovered region the slope depends on ***")
     if shortfall:
-        print(f"[{band_label}] SHORTFALL -- did not reach the {target}-event target for: {shortfall}")
+        print(f"[{band_label} seed={seed}] SHORTFALL -- did not reach the {target}-event target for: {shortfall}")
     skip_info = {
         "n_episodes_completed": n_episodes_completed,
         "n_episodes_skipped": n_episodes_skipped,
         "n_episodes_attempted": n_episodes_completed + n_episodes_skipped,
         "skip_reason_counts": dict(skip_reason_counts),
     }
-    return drift_log_path, final_counts, shortfall, n_episodes_completed, skip_info
+    return final_counts, shortfall, n_episodes_completed, skip_info
 
 
 # =====================================================================================
@@ -360,7 +422,12 @@ def compute_episode_aggregates(attenuation_df):
         np.nan,
         attenuation_df['change_drift_full'] / attenuation_df['agent_drift_full']
     )
-    group_cols = ['scenario_id', 'episode', 'change_type']
+    # 'seed' added to group_cols (AMENDMENT, task T v2 + amendment 1): scenario_id/episode
+    # numbering restarts independently within each seed's own run, so grouping without 'seed'
+    # would silently merge same-numbered episodes from different seeds' checkpoints as if they
+    # were one episode -- the unit of analysis is (seed, scenario_id, episode), not just the
+    # latter two.
+    group_cols = ['seed', 'scenario_id', 'episode', 'change_type']
     agg_dict = {
         'n_discovered': 'median',
         'n_scenario': 'median',
@@ -375,6 +442,14 @@ def compute_episode_aggregates(attenuation_df):
     }
     for agg in AGG_SLICES:
         agg_dict[f'attenuation_ratio_{agg}'] = 'median'
+        agg_dict[f'change_drift_{agg}'] = 'median'  # relative drift per slice, episode-level
+        agg_dict[f'agent_drift_{agg}'] = 'median'
+        # Per-slice absolute norms (STEP 2 columns), carried through so absolute drift per slice
+        # can be derived downstream as rel_drift(s) * norm_h1_s -- not stored as its own column.
+        for snapshot in ('h1', 'h2', 'h3'):
+            col = f'norm_{snapshot}_{agg}'
+            if col in attenuation_df.columns:
+                agg_dict[col] = 'median'
     episode_df = attenuation_df.groupby(group_cols, as_index=False).agg(agg_dict)
     episode_df = episode_df.rename(columns={'zero_noise_floor': 'zero_noise_floor_fraction'})
     episode_df['n_rows'] = attenuation_df.groupby(group_cols).size().values
@@ -465,8 +540,11 @@ def compute_response_rates(raw_events_df, change_type="membership_leave", taus=(
             # phantom NaN rows) -- inflating n_episodes to a constant across every bin (caught
             # empirically: every bin reported n_episodes=1584, implausible against 830 real
             # episodes). observed=True restricts to combinations that actually occurred.
+            # 'seed' added (AMENDMENT, task T v2 + amendment 1): without it, same-numbered
+            # episodes from different seeds' independent runs would be merged as if they were
+            # one episode -- see the identical note in compute_episode_aggregates.
             episode_bin_rates = (
-                slice_df.groupby(['scenario_id', 'episode', 'n_discovered_bin'], observed=True)[moved_col]
+                slice_df.groupby(['seed', 'scenario_id', 'episode', 'n_discovered_bin'], observed=True)[moved_col]
                 .mean().reset_index()
             )
             for bin_val in slice_df['n_discovered_bin'].cat.categories:
@@ -660,10 +738,21 @@ def run_gate_and_outputs(all_episode_df, all_visibility_stats, manifest_bands, s
             if s:
                 emit(f"  band {band}:")
                 for ct, detail in s.items():
-                    emit(f"    {ct}: {detail['count']}/{detail['target']} ({detail['reason']})")
+                    if ct == "_per_seed":
+                        continue
+                    emit(f"    {ct}: {detail['count']}/{detail['target']} (pooled across seeds, {detail['reason']})")
         emit("Analysis below proceeds on whatever data was collected; treat thin-data bands with "
              "extra caution, not silently as equivalent to a full sample.")
         emit("")
+
+    # Per-seed shortfall detail: a pooled total can hide one struggling seed among five.
+    emit("--- Per-seed relevant-event shortfall detail ---")
+    for band, s in shortfalls.items():
+        per_seed = s.get("_per_seed", {}) if isinstance(s, dict) else {}
+        for seed, seed_shortfall in per_seed.items():
+            if seed_shortfall:
+                emit(f"  band {band} seed {seed}: {seed_shortfall}")
+    emit("")
 
     # --- Metric 1: attenuation ratio vs n_discovered, log-log, per change type + per slice ---
     fig1, axes1 = plt.subplots(1, len(change_types_present), figsize=(6 * len(change_types_present), 5), squeeze=False)
@@ -940,6 +1029,90 @@ def run_gate_and_outputs(all_episode_df, all_visibility_stats, manifest_bands, s
                      "this is not the pre-existing recon-synthesis bug (structurally inert given "
                      "patch_service_dynamic_enabled=False on all three checkpoints), so this reading "
                      "is not a bug artefact. ***")
+
+    # --- Between-seed variance (AMENDMENT, task T v2 + amendment 1): the single-seed gate
+    # could not report this at all; its episode-level bootstrap treated episodes from one
+    # trained agent as if they sampled agent variability. With 5 seeds per band now trained,
+    # report the variance of the headline response-rate numbers ACROSS seeds (not just the
+    # within-seed bootstrap CI, which says nothing about seed-to-seed training variance).
+    if all_raw_event_df is not None and len(all_raw_event_df) and 'seed' in all_raw_event_df.columns:
+        emit("")
+        emit("--- Between-seed variance (response rate, tau=0.0, all n_discovered pooled) ---")
+        emit("Each seed's OWN overall response rate (5 independently trained checkpoints per band); "
+             "mean and std are taken ACROSS these 5 per-seed numbers, not across episodes within one "
+             "seed (that within-seed uncertainty is the bootstrap CI reported above/per-bin).")
+        for band in sorted(all_raw_event_df['band'].dropna().unique().tolist()):
+            band_df = all_raw_event_df[all_raw_event_df['band'] == band]
+            for ct in change_types_present:
+                ct_band_df = band_df[band_df['change_type'] == ct]
+                if not len(ct_band_df):
+                    continue
+                seeds_present = sorted(ct_band_df['seed'].dropna().unique().tolist())
+                per_seed_rates = {slice_name: [] for slice_name in RESPONSE_RATE_SLICES}
+                for seed in seeds_present:
+                    seed_df = ct_band_df[ct_band_df['seed'] == seed]
+                    if not len(seed_df):
+                        continue
+                    _, seed_guard = compute_response_rates(seed_df, change_type=ct, taus=(0.0,))
+                    for slice_name in RESPONSE_RATE_SLICES:
+                        rate = seed_guard.get(f'{slice_name}_overall_response_rate_tau0')
+                        if rate is not None and not np.isnan(rate):
+                            per_seed_rates[slice_name].append(rate)
+                emit(f"  band {band}, change_type {ct} ({len(seeds_present)} seeds: {seeds_present}):")
+                for slice_name in RESPONSE_RATE_SLICES:
+                    rates = per_seed_rates[slice_name]
+                    if len(rates) < 2:
+                        rates_str = [f'{r:.1%}' for r in rates] if rates else []
+                        emit(f"    slice={slice_name}: undefined (n_seeds_with_data={len(rates)}, need >=2 for variance) -- rates={rates_str}")
+                        continue
+                    mean_rate = float(np.mean(rates))
+                    std_rate = float(np.std(rates, ddof=1))
+                    emit(f"    slice={slice_name}: mean={mean_rate:.1%}, std={std_rate:.1%} across "
+                         f"{len(rates)} seeds, per-seed values=[{', '.join(f'{r:.1%}' for r in rates)}]")
+
+    # --- Per-slice absolute and relative drift, episode-level, with bootstrap CI and
+    # between-seed variance (AMENDMENT, task T v2 + amendment 1). Relative drift is the
+    # persisted change_drift_{slice} column directly (median across an episode's events).
+    # Absolute drift is NOT stored as its own column (per STEP 2's explicit scope) -- derived
+    # here as rel_drift(s) * norm_h1_s, using the per-slice norm_h1_{slice} columns added in
+    # STEP 2. n_events_pre_at_floor (norm_h1_s <= 1e-9) is computed offline here, from the raw
+    # event data, per the numerics convention -- not added as env-side code.
+    emit("")
+    emit("--- Per-slice absolute and relative drift (episode-level median, bootstrap 0.95 CI) ---")
+    emit("Absolute drift = rel_drift(s) * norm_h1_s (never norm_h2_s - norm_h1_s -- that is the "
+         "difference of two magnitudes, not the magnitude of their difference).")
+    for band in sorted(all_episode_df['band'].dropna().unique().tolist()):
+        band_episode_df = all_episode_df[all_episode_df['band'] == band]
+        for ct in change_types_present:
+            ct_df = band_episode_df[band_episode_df['change_type'] == ct]
+            if not len(ct_df):
+                continue
+            emit(f"  band {band}, change_type {ct}:")
+            for slice_name in RESPONSE_RATE_SLICES:
+                rel_col = 'change_drift_full' if slice_name == 'full' else f'change_drift_{slice_name}'
+                norm_col = 'norm_h1' if slice_name == 'full' else f'norm_h1_{slice_name}'
+                if rel_col not in ct_df.columns or norm_col not in ct_df.columns:
+                    emit(f"    slice={slice_name}: column missing ({rel_col} or {norm_col}), skipped")
+                    continue
+                valid = ct_df[[rel_col, norm_col, 'seed']].dropna()
+                n_events_pre_at_floor = int((valid[norm_col] <= 1e-9).sum())
+                rel_rate, rel_lo, rel_hi = bootstrap_series_ci(valid[rel_col])
+                abs_series = valid[rel_col] * valid[norm_col]
+                abs_rate, abs_lo, abs_hi = bootstrap_series_ci(abs_series)
+                emit(f"    slice={slice_name}: n_episodes={len(valid)}, n_events_pre_at_floor "
+                     f"(norm_h1_{slice_name}<=1e-9)={n_events_pre_at_floor}; "
+                     f"relative drift median={rel_rate:.4f} [{rel_lo:.4f}, {rel_hi:.4f}]; "
+                     f"absolute drift median={abs_rate:.4f} [{abs_lo:.4f}, {abs_hi:.4f}]")
+                # Between-seed variance: each seed's OWN median, then variance across those medians.
+                per_seed_rel = valid.groupby('seed')[rel_col].median()
+                per_seed_abs = (valid[rel_col] * valid[norm_col]).groupby(valid['seed']).median()
+                if len(per_seed_rel) >= 2:
+                    emit(f"      between-seed (n={len(per_seed_rel)}): relative drift mean of "
+                         f"per-seed medians={per_seed_rel.mean():.4f}, std={per_seed_rel.std(ddof=1):.4f}; "
+                         f"absolute drift mean of per-seed medians={per_seed_abs.mean():.4f}, "
+                         f"std={per_seed_abs.std(ddof=1):.4f}")
+                else:
+                    emit(f"      between-seed: undefined (only {len(per_seed_rel)} seed(s) with data, need >=2)")
 
     emit("")
     emit("#" * 100)
