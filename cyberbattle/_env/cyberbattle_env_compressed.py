@@ -344,6 +344,14 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         # NOTE: the re-encode + action-space rebuild happen in step() right after the dynamic change,
         #       so the observation returned this step reflects the post-removal graph
 
+    # Refresh a node's cached feature vector after an in-place property mutation (legacy
+    # patch/service change). The node is always already in evolving_visible_graph by this point
+    # in the step (update_evolving_visible_graph_after_step backfills every discovered node
+    # earlier in the same step), so no discovered/visible guard is needed here, unlike
+    # add_node_dynamic/remove_node_dynamic which handle nodes that may not be.
+    def update_node_dynamic(self, node_id):
+        self.update_node_evolving_visible_graph(node_id)
+
     # Dynamically add a node (called by the base class's dynamic-join mechanism). vulnerabilities_embeddings
     # and vulnerabilities_embeddings_per_node_type are each built ONCE, at construction, from this
     # instance's own nodes (create_vulnerabilities_embeddings/_per_node_type) -- a joined node's

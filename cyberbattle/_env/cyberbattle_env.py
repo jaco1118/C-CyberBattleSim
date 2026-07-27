@@ -425,11 +425,11 @@ class CyberBattleEnv(gym.Env):
     # Orchestrator called once per step, unconditionally, by every subclass's step() (no modulo
     # gate at the call site -- the modulo gating for legacy patch/service changes lives inside
     # here, and the new probabilistic leave/join logic has its own internal ramping/floor-or-
-    # ceiling logic). Returns a single flat list combining node IDs removed AND joined this step
-    # (empty if neither happened) -- callers that only care "did anything change" (e.g.
-    # Compressed's re-encode trigger) can keep checking truthiness unchanged; callers that ignore
-    # the return value (Local/Global, which always rebuild their observation from live state
-    # regardless) are unaffected either way.
+    # ceiling logic). Returns a single flat list combining node IDs touched by a legacy
+    # patch/service change, removed, AND joined this step (empty if none happened) -- callers
+    # that only care "did anything change" (e.g. Compressed's re-encode trigger) can keep
+    # checking truthiness unchanged; callers that ignore the return value (Local/Global, which
+    # always rebuild their observation from live state regardless) are unaffected either way.
     def maybe_apply_dynamic_step(self) -> List["model.NodeID"]:
         # Reset every call (not just on the early-return branches below) so a caller reading
         # self._last_dynamic_events after this returns never sees a stale event from a prior
@@ -445,8 +445,11 @@ class CyberBattleEnv(gym.Env):
         if self.num_iterations == self._dynamic_last_applied_iteration:
             return []
         self._dynamic_last_applied_iteration = self.num_iterations
+        touched: List["model.NodeID"] = []
         if self.patch_service_dynamic_enabled and self.num_iterations % self.change_interval == 0:
-            self._apply_legacy_dynamic_change()
+            touched_node = self._apply_legacy_dynamic_change()
+            if touched_node is not None:
+                touched = [touched_node]
         removed: List["model.NodeID"] = []
         joined: List["model.NodeID"] = []
         if self.dynamic_mode in ("leave", "both"):
@@ -457,10 +460,19 @@ class CyberBattleEnv(gym.Env):
             joined = self._apply_dynamic_join()
             if joined:
                 self._last_dynamic_events.append({"change_type": "membership_join", "node_ids": list(joined)})
-        return removed + joined
+        return touched + removed + joined
+
+    # No-op in the base class; Compressed overrides this to refresh the touched node's cached
+    # feature vector in evolving_visible_graph, mirroring add_node_dynamic/remove_node_dynamic's
+    # existing pattern for membership join/leave.
+    def update_node_dynamic(self, node_id):
+        pass
 
     # Legacy patch/service/mixed changes: node-count invariant, unrelated to the node
     # leave/join population dynamics. Kept as-is, just no longer dispatches "node_leave".
+    # Returns the touched node id (or None) so maybe_apply_dynamic_step can fold it into the
+    # value it returns, and calls update_node_dynamic on it so the node's cached feature vector
+    # is refreshed in the same h2->h3 window membership's graph mutations already occupy.
     def _apply_legacy_dynamic_change(self):
         self._dynamic_change_count += 1
         touched_node = None
@@ -476,6 +488,8 @@ class CyberBattleEnv(gym.Env):
                 touched_node = self._disable_random_service()
         if touched_node is not None:
             self._last_dynamic_events.append({"change_type": "property", "node_ids": [touched_node]})
+            self.update_node_dynamic(touched_node)
+        return touched_node
 
     # Nodes eligible to be dynamically removed: discovered, running, and not one of the
     # currently-protected roles (starter/source/target/interest node).
