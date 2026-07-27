@@ -786,15 +786,70 @@ class CyberBattleEnv(gym.Env):
                         return
         self._synthesize_recon_vulnerability(preferred_parent, new_node_id)
 
+    # Raised only when _synthesize_recon_vulnerability cannot find ANY vulnerability embedding
+    # anywhere in the entire topology to reuse (see the widened-donor search below). Deliberately
+    # a hard failure, not a fabricated vector: a zero (or any invented) embedding is a distance
+    # outlier in cosine-distance nearest-action matching (Task C, 0.3) and would either make the
+    # synthetic action unreachable or, worse, hijack action selection via a NaN cosine distance.
+    class NoVulnerabilityEmbeddingInTopology(Exception):
+        pass
+
     # Fallback used only when no eligible parent has any Reconnaissance-outcome vulnerability at
-    # all. Reuses an existing embedding from the parent (rather than zeros) so the synthetic
-    # vulnerability isn't a systematic outlier in embedding-distance-based action selection
-    # (relevant for the compressed env's cosine-distance nearest-action matching).
+    # all. Reuses an EXISTING embedding (never a fabricated one, e.g. zeros) so the synthetic
+    # vulnerability isn't a systematic distance outlier in embedding-distance-based action
+    # selection (relevant for the compressed env's cosine-distance nearest-action matching).
+    # Widened donor search (Task C, 0.3/0.4 revision): the parent-only search crashed whenever
+    # the parent itself had zero vulnerabilities -- confirmed reachable even with property change
+    # disabled, since join-sponsor eligibility is not gated on vulnerability count (by design, see
+    # below) and several real topologies already contain naturally zero-vulnerability nodes.
+    # Widens to: 1) parent's own vulnerabilities, 2) any other DISCOVERED node's vulnerabilities,
+    # 3) any node anywhere in the topology, 4) raise NoVulnerabilityEmbeddingInTopology if the
+    # entire topology has no vulnerability embedding at all -- never fabricate one.
+    # Deliberately does NOT exclude zero-vulnerability nodes from join-sponsor eligibility here
+    # or anywhere else: doing so would couple the join mechanism to property change (the sponsor
+    # pool would shrink as patching proceeds), entangling two change types meant to be independent.
+    # Selection within tiers 2/3 (the genuinely new search tiers) is deterministic (sorted by
+    # node_id then vulnerability_ID, first match with a truthy .embedding) rather than drawn from
+    # self's RNG, so this fallback never consumes random state and therefore never perturbs any
+    # other draw's sequence in an episode where it fires -- it also does not matter which node's
+    # embedding gets reused here (only that it's a real, well-formed one), so there is nothing for
+    # a seeded random choice to usefully add for the extra complexity of consuming episode RNG
+    # state. Tier 1 (the parent's own vulnerabilities) deliberately keeps the EXACT original
+    # insertion-order iteration (dict .values(), not sorted by ID) rather than being folded into
+    # the same sorted-search helper: checked directly against a real topology and confirmed 3 of
+    # 11 nodes have a different insertion-order-first vs sorted-order-first vulnerability, so
+    # sorting tier 1 too would have silently changed which embedding gets reused in the
+    # pre-existing, already-correct, non-crashing case (parent has >=1 vulnerability) -- that
+    # would have been a real behaviour change smuggled into what must stay the byte-identical path.
     def _synthesize_recon_vulnerability(self, parent_node_id, new_node_id):
         parent_info = self.get_node(parent_node_id)
         vuln_id = f"synthetic_recon_{parent_node_id}_{new_node_id}"
+
+        # Tier 1: parent's own vulnerabilities, EXACT original logic (insertion order), unchanged.
         existing_embeddings = [v.embedding for v in parent_info.vulnerabilities.values() if v.embedding]
-        embedding = existing_embeddings[0] if existing_embeddings else {}
+        embedding = existing_embeddings[0] if existing_embeddings else None
+
+        def first_embedding_in(node_ids):
+            for node_id in sorted(node_ids):
+                node_info = self.get_node(node_id)
+                for candidate_vuln_id in sorted(node_info.vulnerabilities.keys()):
+                    candidate_embedding = node_info.vulnerabilities[candidate_vuln_id].embedding
+                    if candidate_embedding:
+                        return candidate_embedding
+            return None
+
+        # Tier 2: any other discovered node (new). Tier 3: any node in the topology (new).
+        if embedding is None:
+            embedding = first_embedding_in(self.discovered_nodes)
+        if embedding is None:
+            embedding = first_embedding_in(self.environment.nodes())
+        if embedding is None:
+            raise self.NoVulnerabilityEmbeddingInTopology(
+                f"No vulnerability embedding found anywhere in the topology while synthesizing "
+                f"a reconnaissance vulnerability for parent node {parent_node_id!r} "
+                f"(joining node {new_node_id!r})."
+            )
+
         parent_info.vulnerabilities[vuln_id] = model.VulnerabilityInfo(
             vulnerability_ID=vuln_id,
             port=parent_info.services[0].name if parent_info.services else "",
