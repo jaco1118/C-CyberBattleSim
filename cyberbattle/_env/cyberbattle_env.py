@@ -77,6 +77,12 @@ class CyberBattleEnv(gym.Env):
                  dynamic_join_batch_size_mean=1.0, # mean of the Poisson term added to the guaranteed 1 when a batch join event fires
                  dynamic_join_batch_max_fraction=0.3, # cap on batch size as a fraction of the current eligible parent pool
                  dynamic_join_value_weighting=True, # weight per-parent join-sponsorship probability by ownership + node value (self.environment has no edges, so degree is not a meaningful signal here)
+                 # Task CX diagnostic predicate-relaxation flags. ALL default to the pre-CX behaviour;
+                 # each is a FILTER on the candidate list (flag-off reconstructs the exact original set,
+                 # so RNG consumption is byte-identical -- see Task CX STEP 1). Never enable in a reported run.
+                 allow_undiscovered_removal=False, # relax the discovered predicate in removal eligibility
+                 uncapped_join=False,              # remove BOTH join limits (per-episode budget AND the N+max_joins alive clamp)
+                 allow_undiscovered_property=False, # relax the discovered requirement on property targeting
                  **kwargs
                  ):
         self.environment = None
@@ -120,6 +126,9 @@ class CyberBattleEnv(gym.Env):
         self.dynamic_join_batch_size_mean = dynamic_join_batch_size_mean
         self.dynamic_join_batch_max_fraction = dynamic_join_batch_max_fraction
         self.dynamic_join_value_weighting = dynamic_join_value_weighting
+        self.allow_undiscovered_removal = allow_undiscovered_removal
+        self.uncapped_join = uncapped_join
+        self.allow_undiscovered_property = allow_undiscovered_property
         self.dynamic_join_donor_pool = []  # set externally by train_agent.py's env-building loop
         self._dynamic_change_count = 0
         self.__initial_environment: model.Model = initial_environment
@@ -476,6 +485,20 @@ class CyberBattleEnv(gym.Env):
     def _apply_legacy_dynamic_change(self):
         self._dynamic_change_count += 1
         touched_node = None
+        # Task D3: substitution is its own subtype -- one removal + one addition on the same node,
+        # tagged "property_substitution" so it is distinguishable from removal-only "property".
+        if self.change_type == "substitute":
+            result = self._substitute_random_vulnerability()
+            if result is not None:
+                touched_node, removed_vuln_id, added_vuln_id = result
+                # single event, single node_id (0.3): removed/added recorded on the event dict (1.4)
+                # without touching the drift CSV schema (extra keys are ignored by _log_drift_rows).
+                self._last_dynamic_events.append({
+                    "change_type": "property_substitution", "node_ids": [touched_node],
+                    "removed_vuln": removed_vuln_id, "added_vuln": added_vuln_id,
+                })
+                self.update_node_dynamic(touched_node)
+            return touched_node
         if self.change_type == "patch":
             touched_node = self._patch_random_vulnerability()
         elif self.change_type == "service":
@@ -494,8 +517,12 @@ class CyberBattleEnv(gym.Env):
     # Nodes eligible to be dynamically removed: discovered, running, and not one of the
     # currently-protected roles (starter/source/target/interest node).
     def _get_removal_eligible_nodes(self):
+        # Task CX allow_undiscovered_removal: flag-off base is EXACTLY self.discovered_nodes (same object,
+        # same order -> byte-identical candidate list and RNG consumption); flag-on widens to the whole
+        # current topology so undiscovered running nodes become removal-eligible.
+        base = self.environment.nodes() if self.allow_undiscovered_removal else self.discovered_nodes
         return [
-            node for node in self.discovered_nodes
+            node for node in base
             if self.get_node(node).status == model.MachineStatus.Running
             and node != self.starter_node
             and node != self.source_node
@@ -533,6 +560,10 @@ class CyberBattleEnv(gym.Env):
         fraction_ceiling = math.floor(self.dynamic_max_alive_fraction * self.num_nodes)
         absolute_ceiling = self.dynamic_max_alive_nodes if self.dynamic_max_alive_nodes is not None else fraction_ceiling
         ceiling = min(absolute_ceiling, fraction_ceiling)
+        # Task CX uncapped_join (limit 2 of 2): drop the N+max_joins alive clamp so joins are bounded only
+        # by the fraction/absolute ceiling (and the donor pool). Flag-off keeps the exact original clamp.
+        if self.uncapped_join:
+            return ceiling
         return min(ceiling, self.num_nodes + self.dynamic_max_joins_per_episode)
 
     # Probabilistic node-leave: per-node Bernoulli draw each step (probability weighted down for
@@ -631,7 +662,12 @@ class CyberBattleEnv(gym.Env):
             )
             return []
 
-        remaining_budget = self.dynamic_max_joins_per_episode - len(self._dynamic_joined_this_episode)
+        # Task CX uncapped_join (limit 1 of 2): remove the per-episode join-count budget, bounding joins
+        # only by the (finite) donor pool headroom. Flag-off computes the exact original budget expression.
+        if self.uncapped_join:
+            remaining_budget = len(self.dynamic_join_donor_pool) - len(self._used_donor_pool_indices_this_episode)
+        else:
+            remaining_budget = self.dynamic_max_joins_per_episode - len(self._dynamic_joined_this_episode)
         if remaining_budget <= 0 or not self.dynamic_join_donor_pool:
             return []
 
@@ -878,8 +914,11 @@ class CyberBattleEnv(gym.Env):
             self.refresh_vulnerabilities_embeddings_for_node(parent_node_id)
 
     def _patch_random_vulnerability(self) -> Optional["model.NodeID"]:
+        # Task CX allow_undiscovered_property: flag-off base is EXACTLY self.discovered_nodes; flag-on
+        # widens to the whole topology so an undiscovered node can be the property-change target.
+        base = self.environment.nodes() if self.allow_undiscovered_property else self.discovered_nodes
         running_nodes = [
-            node for node in self.discovered_nodes
+            node for node in base
             if self.get_node(node).status == model.MachineStatus.Running
         ]
         if not running_nodes:
@@ -897,8 +936,11 @@ class CyberBattleEnv(gym.Env):
         return None
 
     def _disable_random_service(self) -> Optional["model.NodeID"]:
+        # Task CX allow_undiscovered_property: flag-off base is EXACTLY self.discovered_nodes; flag-on
+        # widens to the whole topology so an undiscovered node can be the property-change target.
+        base = self.environment.nodes() if self.allow_undiscovered_property else self.discovered_nodes
         running_nodes = [
-            node for node in self.discovered_nodes
+            node for node in base
             if self.get_node(node).status == model.MachineStatus.Running
         ]
         if not running_nodes:
@@ -915,6 +957,92 @@ class CyberBattleEnv(gym.Env):
             )
             return node_id
         return None
+
+    # Task D3: substitute one vulnerability on a discovered node -- remove one and add one drawn from
+    # the SAME-scenario catalogue, as a single atomic event. Mirrors DynPen holding the node address
+    # fixed while its properties change. Distinct from _patch_random_vulnerability (removal only) and
+    # kept behind change_type=="substitute" so the removal-only path is byte-identical when off.
+    # Returns (node_id, removed_vuln_id, added_vuln_id) on a genuine swap, else None (0.4: no distinct
+    # donor / node has no vuln -> no-op, no event fired, never counted as a change).
+    def _substitute_random_vulnerability(self):
+        running_nodes = [
+            node for node in self.discovered_nodes
+            if self.get_node(node).status == model.MachineStatus.Running
+        ]
+        if not running_nodes:
+            return None
+        node_id = random.choice(running_nodes)
+        node_info = self.get_node(node_id)
+        if not node_info.vulnerabilities:
+            return None  # nothing to remove -> not a substitution (0.4)
+        current_vuln_ids = set(node_info.vulnerabilities.keys())
+
+        # Donor search BEFORE mutating, so a no-donor case leaves the node untouched (no net removal).
+        # Same-scenario catalogue (self.environment.nodes), widened-donor tiering from Task C
+        # (_synthesize_recon_vulnerability): prefer discovered nodes, then any node; sorted() for
+        # determinism. Donor vuln_ID must be genuinely NEW to this node (excludes every current id,
+        # hence also the id about to be removed) so the swap is never a no-op. Where the compressed
+        # env exposes the per-node actionable catalogue, require the donor to be ACTIONABLE (a vuln
+        # with a canonical outcome, i.e. one that actually enters the action space) so the swap is a
+        # genuine capability-for-capability exchange rather than trading a capability for a
+        # non-actionable one; this stays same-scenario, same distribution (its actionable subset). In
+        # the base env (no such catalogue) the filter is inert and any embedded vuln qualifies.
+        per_type = getattr(self, "vulnerabilities_embeddings_per_node_type", None)
+
+        def actionable_ids(donor_node_id):
+            if per_type is None or donor_node_id not in per_type:
+                return None  # no actionability info available -> do not filter
+            return {e["vulnerability_ID"] for t in ("local", "remote") for e in per_type[donor_node_id][t]}
+
+        def find_donor(node_ids):
+            for donor_node_id in sorted(node_ids):
+                if donor_node_id == node_id:
+                    continue
+                donor_info = self.get_node(donor_node_id)
+                act = actionable_ids(donor_node_id)
+                for cand_id in sorted(donor_info.vulnerabilities.keys()):
+                    if cand_id in current_vuln_ids:
+                        continue
+                    if act is not None and cand_id not in act:
+                        continue  # require actionable donor when the env can tell
+                    cand = donor_info.vulnerabilities[cand_id]
+                    if cand.embedding:  # must carry an embedding to reach x / the action space
+                        return cand_id, cand
+            return None
+
+        donor = find_donor(self.discovered_nodes)
+        if donor is None:
+            donor = find_donor(self.environment.nodes())
+        if donor is None:
+            # No distinct donor anywhere in the scenario -> log a no-op, fire nothing (0.4).
+            self.logger.info(
+                "[DynamicEnv] Step %d: Substitution no-op on node %s (no distinct donor in scenario)",
+                self.num_iterations, node_id
+            )
+            return None
+        added_vuln_id, donor_vuln = donor
+
+        removed_vuln_id = random.choice(list(current_vuln_ids))
+        del node_info.vulnerabilities[removed_vuln_id]
+        node_info.vulnerabilities[added_vuln_id] = copy.deepcopy(donor_vuln)
+        # Reach the action-space catalogue (node feature x is refreshed later via update_node_dynamic).
+        # Guarded exactly as _synthesize_recon_vulnerability, since it is compressed-env-only.
+        if hasattr(self, "refresh_vulnerabilities_embeddings_for_node"):
+            self.refresh_vulnerabilities_embeddings_for_node(node_id)
+        # The dynamic-change gate's create_continuous_action_space() rebuild skips node pairs already
+        # in processed_pairs, so refreshing the per-node-type catalogue alone would NOT surface the
+        # ADDED vuln in the searchable action space. Clear this node's processed-pair marks so the
+        # rebuild re-adds its current vulns. No action key is deleted (see the method's comment): the
+        # removed vuln's stale key persists exactly as in the removal-only condition and is caught at
+        # exploit time, which keeps the space from ever emptying. Substitution-only; the removal-only
+        # patch/service path never calls this, so it stays byte-identical.
+        if hasattr(self, "_invalidate_action_cache_for_node"):
+            self._invalidate_action_cache_for_node(node_id, removed_vuln_id)
+        self.logger.info(
+            "[DynamicEnv] Step %d: Substituted vuln '%s' -> '%s' on node %s",
+            self.num_iterations, removed_vuln_id, added_vuln_id, node_id
+        )
+        return node_id, removed_vuln_id, added_vuln_id
 
     # Function to update the environment data structures based on the outcome of the action taken
     def update_episode_by_outcome(self, outcome, target_node):

@@ -53,7 +53,7 @@ PROVISIONAL_BANNER = (
     "same-band donor pools before appearing in the thesis."
 )
 
-DRIFT_LOG_DIR = os.path.join(script_dir, "attenuation_drift_logs")
+DRIFT_LOG_DIR = os.environ.get("YEG_DRIFT_DIR") or os.path.join(script_dir, "attenuation_drift_logs")  # Task-L STEP3: gated redirect
 OUTPUT_DIR = os.path.join(script_dir, "attenuation_analysis_output")
 
 
@@ -122,6 +122,8 @@ def build_band_envs(train_config, graph_encoder, topology_source_folder, n_topol
             initial_environment=network, logger=logger, verbose=0,
             drift_logging=True, drift_log_path=drift_log_path, drift_sample_rate=1,
             drift_run_id=f"{band_label}_seed{seed}", drift_seed=seed, drift_scenario_id=folder,
+            event_graph_logging=(os.environ.get("YEG") == "1"),  # Task-L STEP3 (gated; unique dir per env avoids float-store offset collisions)
+            event_graph_log_dir=(os.path.join(DRIFT_LOG_DIR, f"eventgraph_{band_label}", f"s{seed}_{folder}") if os.environ.get("YEG") == "1" else None),
             **{k: v for k, v in train_config_for_env.items()
                if k not in ('drift_logging', 'drift_log_path', 'drift_sample_rate',
                              'drift_run_id', 'drift_seed', 'drift_scenario_id')}
@@ -291,10 +293,13 @@ def _collect_one_seed(band_label, band_config, manifest, logger, train_config, g
     skip_reason_counts = Counter()
 
     state = vec_env.reset()
+    _yeg_acts = [] if os.environ.get("YEG") == "1" else None  # Task-L STEP3 action log
     while (n_episodes_completed + n_episodes_skipped) < max_episodes:
         try:
             with torch.no_grad():
                 action, _ = model.predict(state)
+            if _yeg_acts is not None:
+                _yeg_acts.append(np.asarray(action[0], dtype=np.float32).copy())
             state, reward, done, info = vec_env.step(action)
         except ValueError as e:
             # Pre-existing, unrelated bug in _synthesize_recon_vulnerability's embedding
@@ -321,6 +326,9 @@ def _collect_one_seed(band_label, band_config, manifest, logger, train_config, g
 
     for env in envs:
         env._drift_logger.close()
+    if _yeg_acts is not None:  # Task-L STEP3: save the action sequence for replay insurance
+        _egd = os.path.join(DRIFT_LOG_DIR, f"eventgraph_{band_label}"); os.makedirs(_egd, exist_ok=True)
+        np.save(os.path.join(_egd, f"actions_s{seed}.npy"), np.array(_yeg_acts))
 
     final_counts = relevant_counts()
     shortfall = {

@@ -37,6 +37,7 @@ from cyberbattle.simulation import model # noqa: E402
 from cyberbattle.utils.encoding_utils import map_outcome_to_string # noqa: E402
 from cyberbattle.utils.data_utils import flatten_dict_with_arrays, flatten # noqa: E402
 from cyberbattle.utils.drift_logger import DriftLogger # noqa: E402
+from cyberbattle.utils.event_graph_logger import EventGraphLogger # noqa: E402  (Task L side logger; independent of DriftLogger)
 
 # Format of the info dict returned by the step function
 StepInfo = TypedDict(
@@ -105,6 +106,9 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                  drift_run_id=None, # opaque identifiers threaded into every logged row for downstream analysis; this env has no
                  drift_seed=None,   # inherent notion of "seed" or "run_id" (those are set by the caller, e.g. an evaluation script),
                  drift_scenario_id=None, # so these are just passed through as-is
+                 # --- Task L: event-graph side logging (append-only, independent of the drift CSV) ---
+                 event_graph_logging=False, # enable the Task-L side logger (edges/obs/action-keys/identity per change-step); only active when drift_logging is also True
+                 event_graph_log_dir=None,  # directory for the side files; None -> "<drift_log_path without .csv>_eventgraph/"
                  **kwargs
                  ):
         super().__init__(**kwargs)
@@ -182,6 +186,18 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         self.drift_seed = drift_seed
         self.drift_scenario_id = drift_scenario_id
         self._drift_logger = DriftLogger(drift_log_path, self.graph_embeddings_aggregations) if self.drift_logging else None
+        # --- Task L side logger: only ever constructed/used when BOTH drift_logging and
+        # event_graph_logging are on. Reads state and writes its own files; never touches the drift
+        # CSV, env state, or the RNG. Default runs (either flag off) build nothing here. ---
+        self.event_graph_logging = bool(event_graph_logging) and bool(self.drift_logging)
+        self._event_graph_logger = None
+        if self.event_graph_logging:
+            _egd = event_graph_log_dir
+            if _egd is None:
+                _base = drift_log_path[:-4] if (drift_log_path and drift_log_path.endswith(".csv")) else (drift_log_path or "drift")
+                _egd = _base + "_eventgraph"
+            self._event_graph_logger = EventGraphLogger(_egd)
+        self._L_pre = None  # per-step pre-change capture bundle (Task L), reset each step
         self._episode_count = -1  # incremented to 0 on the first reset()
         self._last_connectivity_event = None  # set by add_edge_evolving_visible_graph, consumed/reset once per step
         self._drift_acted_on_nodes = set()  # nodes acted on (as source or target) so far this episode
@@ -350,7 +366,13 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
     # earlier in the same step), so no discovered/visible guard is needed here, unlike
     # add_node_dynamic/remove_node_dynamic which handle nodes that may not be.
     def update_node_dynamic(self, node_id):
-        self.update_node_evolving_visible_graph(node_id)
+        # Task CX 1.1b(ii): null-safety guard mirroring remove_node_evolving_visible_graph's guard at
+        # the removal path. With every flag OFF this is ALWAYS true (a discovered property target is
+        # always already in the visible graph -- see the comment above), so it is byte-identical/inert;
+        # it only matters under allow_undiscovered_property, where an undiscovered target is absent from
+        # the visible graph and the update must be a legitimate no-op instead of a KeyError at :297.
+        if node_id in self.evolving_visible_graph:
+            self.update_node_evolving_visible_graph(node_id)
 
     # Dynamically add a node (called by the base class's dynamic-join mechanism). vulnerabilities_embeddings
     # and vulnerabilities_embeddings_per_node_type are each built ONCE, at construction, from this
@@ -627,6 +649,20 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         # construction being deferred a few lines to pick up this step's change_type.
         duration_in_ms = time.time() - start_time
 
+        # --- Task L pre-change capture (read-only): snapshot the h2-state graph / observation /
+        # action-keys BEFORE the dynamic mutation, so a departing node's degree/discovered/owned are
+        # recorded from when it still existed. Pure reads + copies; no RNG draw, no state mutation. ---
+        self._L_pre = None
+        if self.event_graph_logging and log_this_step:
+            self._L_pre = {
+                "obs_graph": np.array(self.observation["graph_embeddings"], dtype=np.float32).copy(),
+                "obs_discrete": np.array(self.observation["discrete_features"], dtype=np.float32).copy(),
+                "edges": list(self.evolving_visible_graph.edges()),
+                "degrees": {n: d for n, d in self.evolving_visible_graph.degree()},
+                "discovered": set(self.discovered_nodes),
+                "owned": set(self.owned_nodes),
+                "action_keys": list(self.action_embeddings.keys()),
+            }
         nodes_changed = self.maybe_apply_dynamic_step()  # removed and/or joined node IDs this step
         # h2->h3 window events (property/membership_leave/membership_join), if any fired this step
         dynamic_events = list(self._last_dynamic_events)
@@ -670,6 +706,25 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 drift_h1, drift_h2, drift_h3, dynamic_events, drift_connectivity_event,
                 drift_agent_action_succeeded, action_referenced_removed_entity,
             )
+            # --- Task L: record this change-step's REAL runtime graph, full pre/post observation,
+            # action-key set, and per-event node identity/degree/discovered/owned to the side logger.
+            # Read-only; joins to the drift CSV on (run_id, seed, episode, step). Only on steps that
+            # actually fired a dynamic event, so the volume matches the change-event count. ---
+            if self.event_graph_logging and self._L_pre is not None and dynamic_events:
+                self._event_graph_logger.log_step(
+                    run_id=self.drift_run_id, seed=self.drift_seed, scenario_id=self.drift_scenario_id,
+                    episode=self._episode_count, step=self.stepcount,
+                    pre_obs_graph=self._L_pre["obs_graph"], pre_obs_discrete=self._L_pre["obs_discrete"],
+                    post_obs_graph=np.array(self.observation["graph_embeddings"], dtype=np.float32),
+                    post_obs_discrete=np.array(self.observation["discrete_features"], dtype=np.float32),
+                    pre_edges=self._L_pre["edges"], post_edges=list(self.evolving_visible_graph.edges()),
+                    pre_degrees=self._L_pre["degrees"],
+                    pre_discovered=self._L_pre["discovered"], pre_owned=self._L_pre["owned"],
+                    pre_action_keys=self._L_pre["action_keys"],
+                    post_action_keys=list(self.action_embeddings.keys()),
+                    events=[{"event_index": i, "change_type": e["change_type"], "node_ids": e["node_ids"]}
+                            for i, e in enumerate(dynamic_events)],
+                )
             self._drift_prev_step_removed_ids = [
                 node_id for event in dynamic_events if event["change_type"] == "membership_leave"
                 for node_id in event["node_ids"]
@@ -1075,6 +1130,16 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         if self.distance_metric not in metric_mapping:
             raise ValueError(f"Unsupported metric '{self.distance_metric}'. Use 'l1', 'l2', 'inf', or 'cosine'.")
 
+        # Degenerate state guard: an empty action space (e.g. only one node reachable and all its
+        # exploitable vulns are self-loop-filtered lateral/credential) would make embeddings_array 1-D
+        # and crash cdist. Return a benign invalid action the step logic already handles gracefully
+        # (bogus vuln id -> NoVulnerability penalty, no state change), so the episode proceeds to its
+        # normal cutoff exactly as the removal condition's stuck agent does. This is only ever reached
+        # via dynamic vulnerability SUBSTITUTION swapping away a node's last productive vuln; the
+        # static/membership/property conditions never produce an empty action space, so their runs
+        # (F1/F2/F3) are unaffected.
+        if not self.action_embeddings:
+            return self.starter_node, self.starter_node, "__no_valid_action__", model.LateralMove(), 0.0
         embeddings_array = np.array(list(self.action_embeddings.values()))
         vector_segment = np.atleast_2d(np.array(action_vector, dtype=np.float32))
         distances = metric_mapping[self.distance_metric](vector_segment, embeddings_array)
@@ -1168,6 +1233,21 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                     "outcome": result.outcome,
                     "embedding": np.concatenate((embedding, outcome_embedding))
                 })
+
+    # Task D3: surface an in-place vulnerability substitution in the searchable action space. Clear
+    # ONLY this node's processed-pair marks so the next create_continuous_action_space() rebuild
+    # re-processes its pairs and ADDS its current vulns (the added one included, when its outcome
+    # survives the action-space filters). Deliberately does NOT delete any existing action key: the
+    # removed vuln's now-stale key is left in place -- exactly as the removal-only property condition
+    # leaves it -- where selecting it fails at exploit time (NoVulnerability, the vuln is gone from the
+    # node). Deleting it instead risks emptying the action space when the removed vuln was the node's
+    # sole surviving action and the added vuln is filtered out at build (e.g. a CredentialAccess or a
+    # source==target LateralMove), which crashed find_closest_action_embedding (np.array([]) is 1-D).
+    # Not deleting keeps removal and substitution symmetric in their action-space mechanics (the only
+    # difference being that substitution ADDS a usable capability) and can never empty the space.
+    # Called ONLY from the substitution path; the removal-only property path never touches this.
+    def _invalidate_action_cache_for_node(self, node_id, removed_vuln_id=None):
+        self.processed_pairs = {p for p in self.processed_pairs if node_id not in p}
 
     def sample_random_action(self):
         return self.action_space.sample()

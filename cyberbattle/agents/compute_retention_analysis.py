@@ -62,7 +62,13 @@ conditions:
 
 def load_seed_score(pattern, metric, base_dir):
     full_pattern = pattern if os.path.isabs(pattern) else os.path.join(base_dir, pattern)
-    matches = sorted(glob.glob(full_pattern))
+    # The directory portion may contain a literal "[...]" (e.g. a backup-tag rename), which
+    # glob.glob() would otherwise interpret as character-class syntax rather than literal text;
+    # the filename portion's wildcards (*, [89]) are intentional and must stay functional --
+    # escape only the directory prefix, leaving the filename glob pattern untouched.
+    dir_part, file_part = os.path.split(full_pattern)
+    escaped_pattern = os.path.join(glob.escape(dir_part), file_part)
+    matches = sorted(glob.glob(escaped_pattern))
     if not matches:
         raise FileNotFoundError(f"No file matched pattern: {full_pattern}")
     # if multiple test_agent.py invocations left stale CSVs behind, take the newest

@@ -73,12 +73,17 @@ def load_seed_test_auc(pattern, metric, base_dir):
     the test-time curve; points are ordered by CSV file modification time, which matches
     checkpoint/step order since test_agent.py evaluates checkpoints in ascending step order."""
     full_pattern = pattern if os.path.isabs(pattern) else os.path.join(base_dir, pattern)
-    dirs = sorted(glob.glob(full_pattern))
+    # The directory portion may contain a literal "[...]" (e.g. a backup-tag rename), which
+    # glob.glob() would otherwise interpret as character-class syntax rather than literal text;
+    # the filename portion's wildcards are intentional and must stay functional -- escape only
+    # the directory prefix in each call, leaving the wildcard filename pattern untouched.
+    dir_part, file_part = os.path.split(full_pattern)
+    dirs = sorted(glob.glob(os.path.join(glob.escape(dir_part), file_part)))
     if not dirs:
         raise FileNotFoundError(f"No directory matched pattern: {full_pattern}")
     run_dir = sorted(dirs, key=os.path.getmtime)[-1]
 
-    csv_paths = glob.glob(os.path.join(run_dir, "average_performances_*.csv"))
+    csv_paths = glob.glob(os.path.join(glob.escape(run_dir), "average_performances_*.csv"))
     if not csv_paths:
         raise FileNotFoundError(f"No average_performances_*.csv found in {run_dir}")
     csv_paths.sort(key=os.path.getmtime)

@@ -82,7 +82,13 @@ def extract_auc_from_tensorboard(tensorboard_path, metric_name):
 
 def load_seed_auc(pattern, metric, base_dir):
     full_pattern = pattern if os.path.isabs(pattern) else os.path.join(base_dir, pattern)
-    matches = sorted(glob.glob(full_pattern))
+    # The directory portion may contain a literal "[...]" (e.g. a backup-tag rename), which
+    # glob.glob() would otherwise interpret as character-class syntax rather than literal text;
+    # the filename portion's wildcards (if any) are intentional and must stay functional --
+    # escape only the directory prefix, leaving the final path component untouched.
+    dir_part, file_part = os.path.split(full_pattern)
+    escaped_pattern = os.path.join(glob.escape(dir_part), file_part)
+    matches = sorted(glob.glob(escaped_pattern))
     if not matches:
         raise FileNotFoundError(f"No directory matched pattern: {full_pattern}")
     matches.sort(key=os.path.getmtime)

@@ -26,7 +26,7 @@ runs = {
     "Local, 10-15, static, single-topology (matched)": f"{LOGS}/local_10-15_static_single_trpo_matched_2026-07-17_17-40-29/TRPO_x_control_SecureBERT/TRPO_1",
     "Compressed, 10-15, dynamic, single-topology (matched)": f"{LOGS}/compressed_10-15_dynamic_single_trpo_matched_2026-07-17_17-11-52/TRPO_x_control_SecureBERT/TRPO_1",
     "Compressed, 10-15, static, single-topology (matched)": f"{LOGS}/compressed_10-15_static_single_trpo_matched_2026-07-17_17-40-29/TRPO_x_control_SecureBERT/TRPO_1",
-    "Compressed, 10-15, dynamic, 500-graph (PPO, PE-fixed)": f"{LOGS}/compressed_10-15_dynamic_multi500_ppo_pefix_2026-07-17_13-06-04/PPO_x_control_SecureBERT/PPO_1",
+    "Compressed, 10-15, dynamic, 500-graph (PPO, PE-fixed)": f"{LOGS}/[useless but backup] compressed_10-15_dynamic_multi500_ppo_pefix_2026-07-17_13-06-04/PPO_x_control_SecureBERT/PPO_1",
     "Compressed, 10-15, dynamic, 500-graph (TRPO, PE-fixed)": f"{LOGS}/compressed_10-15_dynamic_multi500_trpo_pefix_2026-07-17_13-06-09/TRPO_x_control_SecureBERT/TRPO_1",
     "Local, 10-15, dynamic, 500-graph (fair multi-topology attempt)": f"{LOGS}/local_10-15_dynamic_multi500_trpo_fair_2026-07-17_15-50-21/TRPO_x_control_SecureBERT/TRPO_1",
 }
