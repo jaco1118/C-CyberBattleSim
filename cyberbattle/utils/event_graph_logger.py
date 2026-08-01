@@ -73,10 +73,13 @@ class EventGraphLogger:
     def log_step(self, *, run_id, seed, scenario_id, episode, step,
                  pre_obs_graph, pre_obs_discrete, post_obs_graph, post_obs_discrete,
                  pre_edges, post_edges, pre_degrees,
-                 pre_discovered, pre_owned, pre_action_keys, post_action_keys, events):
+                 pre_discovered, pre_owned, pre_action_keys, post_action_keys, events,
+                 pre_root=None, distinct_max_holders=None, distinct_min_holders=None):
         """One record per logged change-step. `events` is a list of dicts, one per fired dynamic
-        event this step, each: {event_index, change_type, node_ids}. Degree/discovered/owned are
-        resolved here from the PRE-change captures (a departed node is gone post-change)."""
+        event this step, each: {event_index, change_type, node_ids}. Degree/discovered/owned/root are
+        resolved here from the PRE-change captures (a departed node is gone post-change).
+        distinct_{max,min}_holders (Task CX B.2): per-step count of distinct nodes holding >=1
+        coordinate-wise extreme in the pre-change per-node embeddings, for the effective-p test."""
         pre_g_off, pre_g_n = self._write_vec(pre_obs_graph)
         post_g_off, post_g_n = self._write_vec(post_obs_graph)
         pre_d_off, pre_d_n = self._write_vec(pre_obs_discrete)
@@ -94,6 +97,10 @@ class EventGraphLogger:
                 "changed_node_degree": (int(pre_degrees[nid]) if nid in pre_degrees else None),
                 "changed_node_discovered": (None if nid is None else int(nid in pre_discovered)),
                 "changed_node_owned": (None if nid is None else int(nid in pre_owned)),
+                # Task CX B.1: root-owned status of the changed node at fire, ALONGSIDE owned (not a
+                # substitute). None if pre_root not supplied or node id is None. Matches the mech-CSV
+                # `was_root` field used for the 69-76% root-departure decomposition.
+                "changed_node_root": (None if (nid is None or pre_root is None) else int(nid in pre_root)),
             })
             self._n_events += 1
         rec = {
@@ -116,9 +123,24 @@ class EventGraphLogger:
         rec["action_keys_post_count"] = n_post
         rec["action_keys_added"] = added
         rec["action_keys_removed"] = removed
+        # Task CX B.2: distinct extremal-holder counts (per-step; one int each for max and min).
+        rec["distinct_max_holders"] = (None if distinct_max_holders is None else int(distinct_max_holders))
+        rec["distinct_min_holders"] = (None if distinct_min_holders is None else int(distinct_min_holders))
         with open(self.jsonl_path, "a") as f:
             f.write(json.dumps(rec) + "\n")
         self._n_steps += 1
+
+    def log_episode(self, *, run_id, seed, scenario_id, episode, record):
+        """Task CX B (per-episode record). One JSON object per completed episode in event_episode.jsonl.
+        `record` is a dict of already-computed episode-terminal quantities (score components, owned/root
+        counts, alive counts, discovered counts, length, termination reason, per-type + root-departure
+        counts). Raw components are logged so BOTH score forms (count-based and ownership ratio) are exact
+        and derivable offline. Append-only, independent of the drift CSV and event_graph.jsonl."""
+        path = os.path.join(self.out_dir, "event_episode.jsonl")
+        out = {"run_id": run_id, "seed": seed, "scenario_id": scenario_id, "episode": int(episode)}
+        out.update(record)
+        with open(path, "a") as f:
+            f.write(json.dumps(out) + "\n")
 
     @property
     def stats(self):

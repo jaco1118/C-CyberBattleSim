@@ -82,7 +82,9 @@ class CyberBattleEnv(gym.Env):
                  # so RNG consumption is byte-identical -- see Task CX STEP 1). Never enable in a reported run.
                  allow_undiscovered_removal=False, # relax the discovered predicate in removal eligibility
                  uncapped_join=False,              # remove BOTH join limits (per-episode budget AND the N+max_joins alive clamp)
-                 allow_undiscovered_property=False, # relax the discovered requirement on property targeting
+                 # (allow_undiscovered_property removed in Task CX STEP 2 -- property runs as the inherited
+                 #  change type, discovered-only, so no flag ships. The compressed-env membership guard it
+                 #  motivated is KEPT as a standalone null-safety fix. See evidence_taskCX.md.)
                  **kwargs
                  ):
         self.environment = None
@@ -128,7 +130,6 @@ class CyberBattleEnv(gym.Env):
         self.dynamic_join_value_weighting = dynamic_join_value_weighting
         self.allow_undiscovered_removal = allow_undiscovered_removal
         self.uncapped_join = uncapped_join
-        self.allow_undiscovered_property = allow_undiscovered_property
         self.dynamic_join_donor_pool = []  # set externally by train_agent.py's env-building loop
         self._dynamic_change_count = 0
         self.__initial_environment: model.Model = initial_environment
@@ -914,11 +915,8 @@ class CyberBattleEnv(gym.Env):
             self.refresh_vulnerabilities_embeddings_for_node(parent_node_id)
 
     def _patch_random_vulnerability(self) -> Optional["model.NodeID"]:
-        # Task CX allow_undiscovered_property: flag-off base is EXACTLY self.discovered_nodes; flag-on
-        # widens to the whole topology so an undiscovered node can be the property-change target.
-        base = self.environment.nodes() if self.allow_undiscovered_property else self.discovered_nodes
         running_nodes = [
-            node for node in base
+            node for node in self.discovered_nodes
             if self.get_node(node).status == model.MachineStatus.Running
         ]
         if not running_nodes:
@@ -936,11 +934,8 @@ class CyberBattleEnv(gym.Env):
         return None
 
     def _disable_random_service(self) -> Optional["model.NodeID"]:
-        # Task CX allow_undiscovered_property: flag-off base is EXACTLY self.discovered_nodes; flag-on
-        # widens to the whole topology so an undiscovered node can be the property-change target.
-        base = self.environment.nodes() if self.allow_undiscovered_property else self.discovered_nodes
         running_nodes = [
-            node for node in base
+            node for node in self.discovered_nodes
             if self.get_node(node).status == model.MachineStatus.Running
         ]
         if not running_nodes:

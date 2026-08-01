@@ -27,6 +27,8 @@ import pickle
 import sys
 import textwrap
 import warnings
+import random
+import json
 from collections import defaultdict, Counter
 
 import numpy as np
@@ -87,6 +89,50 @@ def load_band_model_and_encoder(run_folder):
     return train_config, graph_encoder, model, checkpoint_path, vecnormalize_path
 
 
+def _cx_write_run_metadata(band_label, seed, run_folder, checkpoint_path, vecnormalize_path, train_config):
+    """Task CX Section B item 9: per-run provenance written INTO the CX output dir (never a shared path a
+    later run could overwrite). Copies the VecNormalize pickle in too (Section C / RQ2c: the logged obs is
+    pre-normalisation, so the policy input is reproducible only with this pickle). Only writes its own files."""
+    import hashlib, shutil, subprocess
+    egdir = os.path.join(DRIFT_LOG_DIR, f"eventgraph_{band_label}")
+    os.makedirs(egdir, exist_ok=True)
+
+    def _sha(p):
+        if not p or not os.path.exists(p):
+            return None
+        h = hashlib.sha256()
+        with open(p, "rb") as f:
+            for c in iter(lambda: f.read(1 << 20), b""):
+                h.update(c)
+        return h.hexdigest()
+
+    try:
+        commit = subprocess.check_output(["git", "-C", project_root, "rev-parse", "HEAD"], text=True).strip()
+    except Exception:
+        commit = None
+    vn_dest = os.path.join(egdir, f"vecnormalize_s{seed}.pkl")
+    if vecnormalize_path and os.path.exists(vecnormalize_path):
+        shutil.copy2(vecnormalize_path, vn_dest)
+    else:
+        vn_dest = None
+    meta = {
+        "band": band_label, "seed": seed, "run_folder": run_folder,
+        "PYTHONHASHSEED": os.environ.get("PYTHONHASHSEED"), "set_num_threads": 1,
+        "flags": {
+            "allow_undiscovered_removal": os.environ.get("CX_REMOVAL", "1") == "1",
+            "uncapped_join": os.environ.get("CX_JOIN", "1") == "1",
+            "patch_service_dynamic_enabled": os.environ.get("CX_PATCH", "1") == "1",
+            "allow_undiscovered_property": False,  # removed from the tree (property runs inherited/discovered-only)
+        },
+        "checkpoint_path": checkpoint_path, "checkpoint_sha256": _sha(checkpoint_path),
+        "vecnormalize_src": vecnormalize_path, "vecnormalize_sha256": _sha(vecnormalize_path),
+        "vecnormalize_copied_to": vn_dest, "algorithm": train_config.get("algorithm"),
+        "code_commit": commit,
+    }
+    with open(os.path.join(egdir, f"run_metadata_s{seed}.json"), "w") as f:
+        json.dump(meta, f, indent=2)
+
+
 def build_band_envs(train_config, graph_encoder, topology_source_folder, n_topologies, logger,
                      drift_log_path, band_label, seed):
     from cyberbattle._env.cyberbattle_env_compressed import CyberBattleCompressedEnv
@@ -114,6 +160,18 @@ def build_band_envs(train_config, graph_encoder, topology_source_folder, n_topol
 
     envs = []
     train_config_for_env = {k: v for k, v in train_config.items() if k != 'verbose'}
+    # Task CX STEP 2 diagnostic condition ONLY (gated on CX_DIAG; runs to a SEPARATE output dir and is
+    # NEVER merged with / compared against the reported runs). Relaxes OUR OWN constraints (undiscovered
+    # removal + uncapped join) and enables the INHERITED legacy property mechanism (patch/service) which
+    # runs discovered-only as its authors defined it -- property targeting is NOT relaxed (that flag was
+    # removed). Inert by default -> reported runs are byte-identical to the env-baseline-2026-08-01 tag.
+    if os.environ.get("CX_DIAG") == "1":
+        train_config_for_env = dict(train_config_for_env)
+        train_config_for_env['allow_undiscovered_removal'] = os.environ.get("CX_REMOVAL", "1") == "1"
+        train_config_for_env['uncapped_join'] = os.environ.get("CX_JOIN", "1") == "1"
+        # patch_service_dynamic_enabled: SEPARATE switch from any relaxation; TRUE here (this condition's
+        # own config only) is what makes the inherited property change fire. NOT the removed property flag.
+        train_config_for_env['patch_service_dynamic_enabled'] = os.environ.get("CX_PATCH", "1") == "1"
     for idx, folder in enumerate(topology_ids):
         network_file = os.path.join(topo_folder, folder, f"network_{train_config['nlp_extractor']}.pkl")
         with open(network_file, 'rb') as f:
@@ -177,6 +235,13 @@ def collect_band_data(band_label, band_config, manifest, logger):
         run_folder = os.path.join(script_dir, run_folder_rel)
         train_config, graph_encoder, model, checkpoint_path, vecnormalize_path = load_band_model_and_encoder(run_folder)
         seed = train_config['seeds_runs'][0]
+        if os.environ.get("CX_DIAG") == "1":
+            # Task CX Section 4 determinism: PYTHONHASHSEED=0 is set in the env; pin threads + seed all
+            # three RNGs per seed so the run is reproducible. Task L verified byte-identical replay under
+            # exactly this (set_num_threads(1) + seed + PYTHONHASHSEED=0), even with stochastic predict.
+            torch.set_num_threads(1)
+            random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
+            _cx_write_run_metadata(band_label, seed, run_folder, checkpoint_path, vecnormalize_path, train_config)
         final_counts, shortfall, n_episodes_completed, skip_info = _collect_one_seed(
             band_label, band_config, manifest, logger, train_config, graph_encoder, model,
             checkpoint_path, vecnormalize_path, drift_log_path, seed,
@@ -294,6 +359,8 @@ def _collect_one_seed(band_label, band_config, manifest, logger, train_config, g
 
     state = vec_env.reset()
     _yeg_acts = [] if os.environ.get("YEG") == "1" else None  # Task-L STEP3 action log
+    _yeg_ep_ends = [] if _yeg_acts is not None else None       # Task CX: action-index at each episode end
+    _yeg_ep_completed = [] if _yeg_acts is not None else None  # True=completed, False=skipped (recon-synth bug)
     while (n_episodes_completed + n_episodes_skipped) < max_episodes:
         try:
             with torch.no_grad():
@@ -310,10 +377,14 @@ def _collect_one_seed(band_label, band_config, manifest, logger, train_config, g
                 n_crashes_skipped += 1
                 n_episodes_skipped += 1
                 skip_reason_counts["recon_synthesis_bug"] += 1
+                if _yeg_ep_ends is not None:
+                    _yeg_ep_ends.append(len(_yeg_acts)); _yeg_ep_completed.append(False)
                 state = vec_env.reset()
                 continue
             raise
         if done[0]:
+            if _yeg_ep_ends is not None:
+                _yeg_ep_ends.append(len(_yeg_acts)); _yeg_ep_completed.append(True)
             n_episodes_completed += 1
             if n_episodes_completed % 10 == 0:
                 counts = relevant_counts()
@@ -326,9 +397,13 @@ def _collect_one_seed(band_label, band_config, manifest, logger, train_config, g
 
     for env in envs:
         env._drift_logger.close()
-    if _yeg_acts is not None:  # Task-L STEP3: save the action sequence for replay insurance
+    if _yeg_acts is not None:  # Task-L STEP3 + Task CX: action sequence + per-episode boundaries for replay
         _egd = os.path.join(DRIFT_LOG_DIR, f"eventgraph_{band_label}"); os.makedirs(_egd, exist_ok=True)
         np.save(os.path.join(_egd, f"actions_s{seed}.npy"), np.array(_yeg_acts))
+        # episode boundaries: episode k = actions[ep_ends[k-1]:ep_ends[k]] (ep_ends[-1]=0-base start). The
+        # completed flag aligns each segment with the event_episode.jsonl records (skipped episodes excluded).
+        np.save(os.path.join(_egd, f"actions_s{seed}_ep_ends.npy"), np.array(_yeg_ep_ends, dtype=np.int64))
+        np.save(os.path.join(_egd, f"actions_s{seed}_ep_completed.npy"), np.array(_yeg_ep_completed, dtype=bool))
 
     final_counts = relevant_counts()
     shortfall = {

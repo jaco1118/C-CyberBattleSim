@@ -222,3 +222,43 @@ outstanding — no writable independent target reachable from this node) is what
 
 **GATE: STEP 1 reported — regression PASS (0 differing cells, both bands). STOPPING.** STEP 2 remains queued
 behind Task L STEP 3 (done), the OI-1 probe re-run, and the RQ2(c) counterfactual.
+
+## STEP 2 PREP (2026-08-01) — design change + a fourth environment defect [FINDING]
+
+### Design change: property runs INHERITED, so `allow_undiscovered_property` is removed from the tree
+The STEP 2 design changed to relax only OUR OWN constraints (undiscovered removal, uncapped join) and to run
+the INHERITED property change (patch/service, `_apply_legacy_dynamic_change`, evidence_taskD.md 0.1) exactly as
+its authors defined it — **discovered-only**. So the property cell table becomes **five of six** cells
+(removal×{disc,undisc}, join×{disc,undisc}, property×disc); property×undisc is NOT run.
+
+- **`allow_undiscovered_property` was implemented in STEP 1** and **smoke-tested successfully**: in the
+  flag-isolation run (property flag + `patch_service_dynamic_enabled=True`, other flags off) it produced
+  **115 property events including undiscovered targets, no crash — the `update_node_dynamic` guard's FALSE
+  branch was exercised** for the first time. It was **regression-proven inert** (STEP 1, 0 cells).
+- **Removed 2026-08-01** when the design changed: shipped code should be the code that produced the results, and
+  a reader should not find a switch that would populate a cell reported as unrun. The removal reverts
+  `_patch_random_vulnerability`/`_disable_random_service` to the exact pre-CX (discovered-only) form; the
+  `update_node_dynamic` **membership guard is KEPT** as a standalone null-safety fix (ordinary defensive code).
+- **`patch_service_dynamic_enabled=True`** in this condition's own config only is a **separate** switch (it is
+  what makes the inherited property fire) and is **not** removed. Post-removal STEP 1 regression: see gate below.
+
+### Fourth environment defect (found by audit; INHERITED; effect NIL) — `attacker_actions.py:511/552`
+The Reconnaissance branch of `exploit_local_vulnerability` looped `for node_id in outcome.nodes:` (**line 511**),
+shadowing the source-node parameter `node_id`; line 552 (`self._discovered_nodes[node_id].last_attack[...]`)
+then wrote against the **last recon node, not the source**. It has fired in **every reported run** — `last_attack`
+has always been recorded on the wrong node in recon cases.
+- **Effect on every reported figure: NIL.** `last_attack` is written in exactly two places and **read in none**
+  (verified: `grep last_attack` → 1 field def + 2 writes, 0 reads); the value is inert.
+- **Why it never crashed before:** the actuator's `_discovered_nodes` is never purged on dynamic removal, so a
+  removed-but-previously-*discovered* node's stale entry was still present to write to. `allow_undiscovered_removal`
+  removes **undiscovered** nodes — never in `_discovered_nodes` — still referenced in recon lists → KeyError.
+- **INHERITED** (Condition 2): loop 511 + write 552 both from `911570f0` (fterrano, 2025-07-11, fork base),
+  present in both local and remote exploit paths there; our only edit to the region (`7d7df168`) added the
+  `continue`-on-removed-node guard for dynamic-leave. Not ours.
+- **Fix (Condition-1 verified):** pure rename of the local loop var `node_id`→`discovered_node_id` (lines
+  511/515/517/519/521) so line 552 references the source. Verified from source that reaching :552 requires the
+  source to be owned (`:368` guard) and every `agent_installed=True` setter keeps the source in `_discovered_nodes`
+  (`__mark_node_as_owned:80-82`; starter owned before actuator build `env:183`<`:211`; defender gated off,
+  `static_defender_agent: null`) — so the rename REMOVES the KeyError, cannot move it. Remote path left as-is
+  (its write uses `target_node_id`, not the leaked var → harmless). No control flow, no branch, no RNG draw.
+- This is the **4th** environment defect surfaced by audit, all shown harmless-to-figures (with [[claims_audit]]).

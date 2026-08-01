@@ -251,6 +251,12 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         self._drift_acted_on_nodes = set()
         self._drift_prev_step_removed_ids = []
         self._drift_pending_nodes = []
+        # Task CX per-episode accumulators (record emitted at episode end from step()). initial alive
+        # count is captured now, before any within-episode join/leave changes it (uncapped_join makes
+        # network size a within-episode variable, so start and end must both be recorded).
+        self._cx_ep_event_counts = {}
+        self._cx_ep_root_departures = 0
+        self._cx_ep_initial_alive = len(self.environment.nodes)
         self.graph_encoder_time = 0
         self.action_calculation_time = 0
         self.action_space_creation_time = 0
@@ -366,11 +372,10 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
     # earlier in the same step), so no discovered/visible guard is needed here, unlike
     # add_node_dynamic/remove_node_dynamic which handle nodes that may not be.
     def update_node_dynamic(self, node_id):
-        # Task CX 1.1b(ii): null-safety guard mirroring remove_node_evolving_visible_graph's guard at
-        # the removal path. With every flag OFF this is ALWAYS true (a discovered property target is
-        # always already in the visible graph -- see the comment above), so it is byte-identical/inert;
-        # it only matters under allow_undiscovered_property, where an undiscovered target is absent from
-        # the visible graph and the update must be a legitimate no-op instead of a KeyError at :297.
+        # Null-safety guard mirroring remove_node_evolving_visible_graph's guard on the removal path
+        # (Task CX). For the inherited discovered-only property change the target is always already in the
+        # visible graph, so this is always true and byte-identical to the unguarded code; the membership
+        # check simply makes an update on any not-yet-visible node a legitimate no-op instead of a KeyError.
         if node_id in self.evolving_visible_graph:
             self.update_node_evolving_visible_graph(node_id)
 
@@ -654,6 +659,14 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         # recorded from when it still existed. Pure reads + copies; no RNG draw, no state mutation. ---
         self._L_pre = None
         if self.event_graph_logging and log_this_step:
+            # Task CX B.1: root-owned set (owned AND privilege ROOT) captured pre-change, for was_root.
+            pre_root = {
+                n for n in self.owned_nodes
+                if n in self.environment.nodes and self.get_node(n).privilege_level == model.PrivilegeLevel.ROOT
+            }
+            # Task CX B.2: distinct nodes holding >=1 coordinate-wise extreme in the PRE-change per-node
+            # embeddings (h2-state). Read-only over node_embeddings already in memory; one int per extreme.
+            d_max, d_min = self._distinct_extremal_holders()
             self._L_pre = {
                 "obs_graph": np.array(self.observation["graph_embeddings"], dtype=np.float32).copy(),
                 "obs_discrete": np.array(self.observation["discrete_features"], dtype=np.float32).copy(),
@@ -661,7 +674,10 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 "degrees": {n: d for n, d in self.evolving_visible_graph.degree()},
                 "discovered": set(self.discovered_nodes),
                 "owned": set(self.owned_nodes),
+                "root": pre_root,
                 "action_keys": list(self.action_embeddings.keys()),
+                "distinct_max_holders": d_max,
+                "distinct_min_holders": d_min,
             }
         nodes_changed = self.maybe_apply_dynamic_step()  # removed and/or joined node IDs this step
         # h2->h3 window events (property/membership_leave/membership_join), if any fired this step
@@ -724,13 +740,58 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                     post_action_keys=list(self.action_embeddings.keys()),
                     events=[{"event_index": i, "change_type": e["change_type"], "node_ids": e["node_ids"]}
                             for i, e in enumerate(dynamic_events)],
+                    pre_root=self._L_pre["root"],
+                    distinct_max_holders=self._L_pre["distinct_max_holders"],
+                    distinct_min_holders=self._L_pre["distinct_min_holders"],
                 )
+                # Task CX per-episode accumulation (co-located with the per-event data)
+                for e in dynamic_events:
+                    ct = e["change_type"]
+                    self._cx_ep_event_counts[ct] = self._cx_ep_event_counts.get(ct, 0) + 1
+                    if ct == "membership_leave":
+                        self._cx_ep_root_departures += sum(1 for nid in e["node_ids"] if nid in self._L_pre["root"])
             self._drift_prev_step_removed_ids = [
                 node_id for event in dynamic_events if event["change_type"] == "membership_leave"
                 for node_id in event["node_ids"]
             ]
 
+        # Task CX B: emit the per-episode record at episode end (state is still intact here; the
+        # VecEnv auto-resets only after step() returns). Read-only; no RNG, no state mutation.
+        if (self.event_graph_logging and self._event_graph_logger is not None
+                and (self.done or self.truncated)):
+            self._emit_cx_episode_record()
+
         return self.observation, self.reward, self.done or self.truncated, info
+
+    # Task CX B: build + write the per-episode record. Raw score components are logged so BOTH score
+    # forms are exact and derivable: count-based = final owned/root-owned counts; ownership ratio =
+    # count / (ownable_count + 1) (the eval's definition, cyberbattle/utils/test_utils.py:190).
+    def _emit_cx_episode_record(self):
+        owned = [n for n in self.owned_nodes if n in self.environment.nodes]
+        root_owned = [n for n in owned if self.get_node(n).privilege_level == model.PrivilegeLevel.ROOT]
+        ownable = getattr(self, "ownable_count", None)
+        final_alive = len(self.environment.nodes)
+        denom = (ownable + 1) if ownable is not None else None
+        record = {
+            "episode_length": int(self.stepcount),
+            "termination_reason": getattr(self, "end_episode_reason", None),
+            "goal_reached": bool(self.attacker_goal_reached()),
+            "final_owned_count": len(owned),                 # count-based score (owned)
+            "final_root_owned_count": len(root_owned),       # count-based score (root)
+            "ownable_count": (int(ownable) if ownable is not None else None),
+            "owned_ratio": (len(owned) / denom if denom else None),          # ownership ratio (owned)
+            "root_owned_ratio": (len(root_owned) / denom if denom else None),# ownership ratio (root)
+            "initial_alive": int(getattr(self, "_cx_ep_initial_alive", final_alive)),
+            "final_alive": final_alive,
+            "num_nodes_start": int(self.num_nodes),
+            "n_discovered_end": len(self.discovered_nodes),          # CURRENT (drops on removal) -- unchanged meaning
+            "cumulative_discovered": int(self.discovered_amount),    # NEW: cumulative-ever discovered
+            "event_counts": dict(getattr(self, "_cx_ep_event_counts", {})),
+            "root_owned_departures": int(getattr(self, "_cx_ep_root_departures", 0)),
+        }
+        self._event_graph_logger.log_episode(
+            run_id=self.drift_run_id, seed=self.drift_seed,
+            scenario_id=self.drift_scenario_id, episode=self._episode_count, record=record)
 
     # =========================================================================================
     # Diagnostic-only drift instrumentation (Phase 1, thesis pivot). Everything below is only
@@ -749,6 +810,22 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             slices[agg] = observation_embedding[i * dim:(i + 1) * dim]
         combined = observation_embedding[:len(self.graph_embeddings_aggregations) * dim]
         return slices, combined
+
+    # Task CX B.2: distinct nodes holding >=1 coordinate-wise max (and min) across the per-node
+    # embeddings currently in self.node_embeddings (the pre-change h2 state). Returns (n_max, n_min).
+    # Read-only, no RNG, no state mutation. The effective-p test (evidence_taskAN CONCLUSION WITHHELD)
+    # reads this: near node_embeddings_dimensions => coords independent, p=64 null stands; well below =>
+    # effective p lower. Empty/singleton graphs return their node count.
+    def _distinct_extremal_holders(self):
+        if not self.node_embeddings:
+            return 0, 0
+        ids = list(self.node_embeddings.keys())
+        M = np.stack([np.asarray(self.node_embeddings[n], dtype=np.float32) for n in ids])  # (n_nodes, dim)
+        if M.shape[0] <= 1:
+            return M.shape[0], M.shape[0]
+        n_max = len({int(i) for i in np.argmax(M, axis=0)})
+        n_min = len({int(i) for i in np.argmin(M, axis=0)})
+        return n_max, n_min
 
     # h1/h2/h3 snapshot "from cache": reuses node_embeddings/observation already sitting in
     # self.* (because the production code path either just computed them at reset()/the start of

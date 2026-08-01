@@ -508,17 +508,23 @@ class AttackerAgentActions:
             # Discovering the nodes related to the vulnerability if not already discovered
             newly_discovered_nodes = 0
             newly_discovered_nodes_value = 0
-            for node_id in outcome.nodes:
+            # Loop var renamed node_id -> discovered_node_id (Task CX). The inherited (fterrano 911570f0)
+            # loop shadowed the source-node parameter node_id, so line 552 below wrote last_attack against the
+            # LAST recon node, not the source. Nil effect on reported runs (last_attack written in 2 places,
+            # read in 0), but it KeyErrors once an undiscovered removed node is left bound here
+            # (allow_undiscovered_removal). Pure rename: no control flow, no branch, no RNG draw. The remote
+            # exploit has the same inherited shadowing but is harmless (its write uses target_node_id).
+            for discovered_node_id in outcome.nodes:
                 # a vulnerability's static Reconnaissance outcome can still reference a node that
                 # has since been dynamically removed from the topology (cyberbattle_env.py's
                 # dynamic-leave feature) -- skip it rather than KeyError on the graph lookup below
-                if node_id not in self._environment.nodes:
+                if discovered_node_id not in self._environment.nodes:
                     continue
-                if self.__mark_node_as_discovered(node_id):
+                if self.__mark_node_as_discovered(discovered_node_id):
                     if self.verbose > 2:
-                        self.logger.info("Node %s discovered", node_id)
+                        self.logger.info("Node %s discovered", discovered_node_id)
                     newly_discovered_nodes += 1
-                    newly_discovered_nodes_value += self._environment.nodes(data=True)[node_id]["data"].value
+                    newly_discovered_nodes_value += self._environment.nodes(data=True)[discovered_node_id]["data"].value
             total_reward += self.rewards_dict['node_discovered_coefficient'] * newly_discovered_nodes
             if self.verbose > 2:
                 self.logger.info("Reward (nodes discovered): += %s * %s",

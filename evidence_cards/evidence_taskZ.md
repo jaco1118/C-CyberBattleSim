@@ -69,7 +69,14 @@ condition (>1 distinct value ⇒ STOP) is **NOT triggered**. Arm 3 is a valid co
 substitution is applied post-normalisation** (as here); the same substitution applied *before* VecNormalize
 during training-time stat updates is the failure mode Task N flagged and is deliberately avoided.
 
-## 0.4 ARM-2 IS CONFIGURATION-ONLY [FINDING]
+**Drift scope [2026-08-01, verified from source].** Every drift metric (`change_drift_full`, per-slice
+mean/max/min, `norm_h1/2/3`) is computed over the **192 pooled dims only**: `_split_pooling_slices`
+(`cyberbattle_env_compressed.py:749`) sets `combined = observation_embedding[:len(aggregations)*dim]` = `[:192]`,
+and its docstring (`:740-743`) explicitly excludes "the next_escalation_target / interest_node tail … not part
+of h_G"; `change_drift_full = _rel_drift(h2.combined, h3.combined)` (`:870`). So the **100.0% membership response
+rate is a rate over the pooled representation h_G**; the fourth block `next_escalation[192:256]` (a single-node
+lookup, `:455/459`, NOT a pooling mean) never enters any drift figure. (Code-comment nit: `:147/:155` label the
+block `# owned_not_root_mean` — misleading; the value is `next_escalation_target`.)
 
 Setting `graph_embeddings_aggregations: [mean]` yields a **64-dim pooled** observation. The observation
 space is **derived, never hard-coded to 192** — every location checked scales with
