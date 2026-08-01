@@ -206,5 +206,19 @@ Therefore **every figure/claim cited anywhere (thesis, cards, log) carries the f
 line itself**, so the citation stays greppable after drift. This convention is retroactive-safe: re-locate any
 stale citation by grepping its quoted text.
 
+### PROVENANCE CHAIN (version control) — reads end to end [record, project-wide]
+Every thesis citation → card → script/environment → raw artifact is now pinned:
+
+| link | what | pinned by |
+|---|---|---|
+| raw artifacts | 295 files, 7.34 GB (step-3 logs, gate archive, attenuation_* outputs) | **`1549eb4`** — `evidence_cards/artifact_manifest.tsv` (relpath+size+SHA-256, tamper-evident) |
+| scripts + environment | 2 env files, 5 `compute_*` + `compile_appendix_data.py`, `event_graph_logger.py`, gen config | **`1b42a2c`**, tag **`env-baseline-2026-08-01`** |
+| cards (recorded results) | all `evidence_*.md`, `claims_audit.md`, `open_items.md`, log | **`0a59965`** |
+| thesis → card | citations point at cards | file + line + **quoted line** (line-drift-proof convention above) |
+
+Artifacts are on NFS (`evs2:/cs/student/project_msc/2025`) → reboot-safe, but **single-copy on one server**;
+the manifest makes silent overwrite/truncation detectable, an **independent off-server copy** (still
+outstanding — no writable independent target reachable from this node) is what makes loss recoverable.
+
 **GATE: STEP 1 reported — regression PASS (0 differing cells, both bands). STOPPING.** STEP 2 remains queued
 behind Task L STEP 3 (done), the OI-1 probe re-run, and the RQ2(c) counterfactual.
