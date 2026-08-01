@@ -172,6 +172,14 @@ def build_band_envs(train_config, graph_encoder, topology_source_folder, n_topol
         # patch_service_dynamic_enabled: SEPARATE switch from any relaxation; TRUE here (this condition's
         # own config only) is what makes the inherited property change fire. NOT the removed property flag.
         train_config_for_env['patch_service_dynamic_enabled'] = os.environ.get("CX_PATCH", "1") == "1"
+    if os.environ.get("CX_STATIC") == "1":
+        # Task CX matched static baseline: NOTHING changes -- dynamic_mode none, property off, no
+        # relaxations (flags default off). Same agents/topologies/seeds/budget/protocol as the CX arm, so
+        # the cost/behavioural-residual contrast is like-for-like. Asserted post-run: ZERO change events of
+        # any type, and every change-drift reading exactly zero (re-validates the encoder null control).
+        train_config_for_env = dict(train_config_for_env)
+        train_config_for_env['dynamic_mode'] = "none"
+        train_config_for_env['patch_service_dynamic_enabled'] = False
     for idx, folder in enumerate(topology_ids):
         network_file = os.path.join(topo_folder, folder, f"network_{train_config['nlp_extractor']}.pkl")
         with open(network_file, 'rb') as f:
@@ -235,7 +243,7 @@ def collect_band_data(band_label, band_config, manifest, logger):
         run_folder = os.path.join(script_dir, run_folder_rel)
         train_config, graph_encoder, model, checkpoint_path, vecnormalize_path = load_band_model_and_encoder(run_folder)
         seed = train_config['seeds_runs'][0]
-        if os.environ.get("CX_DIAG") == "1":
+        if os.environ.get("CX_DIAG") == "1" or os.environ.get("CX_STATIC") == "1":
             # Task CX Section 4 determinism: PYTHONHASHSEED=0 is set in the env; pin threads + seed all
             # three RNGs per seed so the run is reproducible. Task L verified byte-identical replay under
             # exactly this (set_num_threads(1) + seed + PYTHONHASHSEED=0), even with stochastic predict.

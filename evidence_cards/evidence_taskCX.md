@@ -262,3 +262,17 @@ has always been recorded on the wrong node in recon cases.
   `static_defender_agent: null`) — so the rename REMOVES the KeyError, cannot move it. Remote path left as-is
   (its write uses `target_node_id`, not the leaked var → harmless). No control flow, no branch, no RNG draw.
 - This is the **4th** environment defect surfaced by audit, all shown harmless-to-figures (with [[claims_audit]]).
+
+### Cost comparability — CX cost is NOT comparable to the reported 0.665 / 0.874 / 0.775 [FINDING, Section C.1]
+Two independent reasons, the second harder than the first:
+1. **Different disturbance model.** CX relaxes removal + join (undiscovered removal, uncapped join); the
+   reported figures use the original discovered-only / capped rules. Different perturbation.
+2. **Different agents (the decisive reason).** The reported cost figures (Task F2:75) come from the F1/F2
+   **static-trained** agents (`dynamic_mode=none`, patch off *during training*); the CX condition evaluates
+   the **dynamic-trained ("adapted") gate checkpoints**. F1's item-3 check shows static vs adapted policy
+   params differ by **max|Δ| 0.29–0.34** across 17 tensors — they are different networks. F1/F2 also used a
+   different eval harness/budget (`calculate_average_performances`, 50 ep) vs CX (`compute_attenuation_analysis`,
+   manifest budget).
+So the two sets of cost figures **measure different systems under different protocols; neither replaces the
+other**. CX's cost is computed against its OWN matched static arm (same adapted checkpoints, `dynamic_mode=none`,
+same topologies/seeds/budget/protocol), run concurrently — never against F1/F2's numbers.
