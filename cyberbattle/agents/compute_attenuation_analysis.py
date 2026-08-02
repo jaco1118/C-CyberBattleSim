@@ -322,6 +322,13 @@ def _collect_one_seed(band_label, band_config, manifest, logger, train_config, g
     if not train_config.get('patch_service_dynamic_enabled', False):
         structurally_impossible.add("property")
     stopping_change_types = [ct for ct in change_types_of_interest if ct not in structurally_impossible]
+    # Task RQ2C measures membership_leave ONLY, so its stopping target is 200 relevant LEAVE events per
+    # seed -- not membership_join too. Under the standard attenuation config join under-samples (budget
+    # exhausted), so keeping join in the stop would force every seed to the full max-episode budget
+    # (~2000 ep/band) for no RQ2C benefit; leave-only makes each seed stop when it has enough leaves,
+    # keeping all three bands feasible and comparable. Gated on RQ2C=1; default behaviour unchanged.
+    if os.environ.get("RQ2C") == "1":
+        stopping_change_types = [ct for ct in stopping_change_types if ct == "membership_leave"]
     if structurally_impossible:
         print(f"[{band_label}] change type(s) {structurally_impossible} are structurally impossible "
               f"under this checkpoint's frozen config (patch_service_dynamic_enabled=False) -- "
