@@ -5,14 +5,17 @@
 set -e
 cd "$(dirname "$0")/.."          # -> cyberbattle/agents
 OUT="$PWD/rq2c_replay"
+# Pin the conda env interpreter that has pandas/torch/stable_baselines3 -- a bare `python` may resolve
+# to /usr/bin/python (no pandas) depending on how the shell was initialised.
+PYBIN="${PYBIN:-/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/bin/python}"
 echo "[resume] deleting partial 30-40 / 80-100 rq2c logs (append-mode; would otherwise double-count)"
 rm -f "$OUT"/rq2c/rq2c_30-40_*.jsonl "$OUT"/rq2c/rq2c_80-100_*.jsonl
 for b in 30-40 80-100; do
   echo "[resume] launching band $b (all 5 seeds)"
   env PYTHONHASHSEED=0 YEG_DRIFT_DIR="$OUT" RQ2C=1 RQ2C_DIR="$OUT/rq2c" \
-    nohup python compute_attenuation_analysis.py --manifest "$OUT/rq2c_manifest_$b.yaml" --collect \
+    nohup "$PYBIN" compute_attenuation_analysis.py --manifest "$OUT/rq2c_manifest_$b.yaml" --collect \
     > "$OUT/run_$b.log" 2>&1 &
 done
 echo "[resume] both bands launched (nohup, survive logout). When done:"
-echo "  python compute_rq2c_action_divergence.py --input-dir $OUT/rq2c --out $OUT/rq2c_action_divergence_table.md --n-boot 10000"
+echo "  $PYBIN compute_rq2c_action_divergence.py --input-dir $OUT/rq2c --out $OUT/rq2c_action_divergence_table.md --n-boot 10000"
 wait
