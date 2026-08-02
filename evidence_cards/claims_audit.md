@@ -63,3 +63,44 @@ depends on these columns; and `attenuation_ratio` was already an ARTIFACT (Task 
 **not** bit-match those join columns from the un-pinned originals — disclose, do not treat as a regression
 miss. Fixing the defect itself (seed the donor pick deterministically) is out of scope here; recorded for the
 methodology.
+
+---
+
+## CA-3 — "forced-action replay from actions.npy, Task L verified byte-identical" over-scopes what was validated  [CLOSED — scope correction; no headline number affected]
+
+**As written / as relied on:** `evidence_taskCX.md:413` ("Forced-action replay from actions.npy (Task L
+verified byte-identical): 4,410 episodes across 3 bands × 5 seeds"), and the RQ2C-1 task premise ("actions.npy
+per band/seed — Task L verified byte-identical"), both read as: the full `attenuation_step3_logs` sweep can be
+faithfully **replayed** from its stored per-seed `actions_s*.npy` to recreate the recorded trajectory.
+
+**What was actually validated as byte-identical** — two SMALL controlled tests, neither the sweep itself:
+1. Task L STEP 2 `drift_regression_check` (`evidence_taskL_logging.md` STEP 2): **2 topologies/bands, 800
+   steps, a FIXED `RandomState(12345)` action sequence** (a synthetic fixed-action stream, *not* the stored
+   policy actions), `old==new_off==new_on`, 0 cells — proves the **instrumentation** is inert, not that a
+   stored-policy trajectory replays.
+2. Task L Amendment 1 (`evidence_taskL_logging.md:219`): **ONE full evaluation episode**, policy in the loop,
+   PYTHONHASHSEED=0 — a single-episode reproduction, not the 4,410-episode sweep.
+
+**What was NOT validated, and is in fact false for the sweep:** the `attenuation_step3_logs` recording ran
+under `YEG=1` **only** — it never went through the CX_DIAG per-seed seeding block (`torch/np/random.seed(seed)
++ set_num_threads(1)`), so its trajectory was not seed-pinned and its stored actions are **not** faithfully
+replayable. **Empirical proof (RQ2C-1, 2026-08-02):** replaying `actions_s42.npy` for band 10-15 produced a
+**completely different** single-node-leave sequence — steps `30,72,86,92,97,126,199,…` vs the recorded
+`2,19,26,44,74,98,231,248,…` — with different episode lengths. Forcing the stored action *vectors* onto a
+differently-seeded churn stream makes `find_closest_action_embedding` snap each vector to whatever is nearest
+in a **mismatched** graph: a self-consistent-looking but **invalid "Frankenstein" trajectory**, not the
+agent's real behaviour. (The CX replay `cx_step2_replay` DID reproduce only because both the CX recording and
+its replay used **CX_DIAG** per-seed seeding — a different, seed-pinned run; the attenuation sweep was not.)
+
+**Do not conflate:** "byte-identical replay" (validated only on the fixed-action regression + one episode) is
+a **stronger, different** property than the sweep's headline reproduction. The sweep's reproduction that WAS
+checked (`evidence_taskL_logging.md` STEP 3: max-slice `membership_leave` response rate 98.4/84.3/42.5 vs
+98.5/84.0/43.0, Δ<1pp) is **distributional**, inside the ~3–4pp hash-seed spread — NOT trajectory-identical.
+The <1pp property is the correct, weaker claim to cite for the sweep.
+
+**Consequence / bounded impact:** no headline number depends on replaying the stored sweep actions — the
+headline reproduction is the distributional <1pp check, which stands as such. This corrects a **methodology**
+statement only. **Action taken (RQ2C-1):** because the stored actions are not faithfully replayable, RQ2(c)
+was measured NOT by replay but by a **fresh, per-seed-seeded stochastic live rollout** of the same
+checkpoints/seeds/bands under the same attenuation config, computing the pre/post counterfactual inline (see
+`evidence_taskRQ2C.md`). Recorded for the methodology; no recompute of any existing figure.

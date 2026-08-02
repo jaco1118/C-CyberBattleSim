@@ -243,10 +243,12 @@ def collect_band_data(band_label, band_config, manifest, logger):
         run_folder = os.path.join(script_dir, run_folder_rel)
         train_config, graph_encoder, model, checkpoint_path, vecnormalize_path = load_band_model_and_encoder(run_folder)
         seed = train_config['seeds_runs'][0]
-        if os.environ.get("CX_DIAG") == "1" or os.environ.get("CX_STATIC") == "1":
+        if os.environ.get("CX_DIAG") == "1" or os.environ.get("CX_STATIC") == "1" or os.environ.get("RQ2C") == "1":
             # Task CX Section 4 determinism: PYTHONHASHSEED=0 is set in the env; pin threads + seed all
             # three RNGs per seed so the run is reproducible. Task L verified byte-identical replay under
             # exactly this (set_num_threads(1) + seed + PYTHONHASHSEED=0), even with stochastic predict.
+            # Task RQ2C reuses the same per-seed seeding + provenance metadata (but NOT the CX_DIAG
+            # constraint relaxation in build_band_envs -- RQ2C runs the standard attenuation config).
             torch.set_num_threads(1)
             random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
             _cx_write_run_metadata(band_label, seed, run_folder, checkpoint_path, vecnormalize_path, train_config)
@@ -366,13 +368,43 @@ def _collect_one_seed(band_label, band_config, manifest, logger, train_config, g
     skip_reason_counts = Counter()
 
     state = vec_env.reset()
+    # Task RQ2C (gated): attach the loaded policy + VecNormalize to each underlying env so the
+    # env-side single-node-membership_leave counterfactual (does the choice follow the view or only
+    # the action set) can predict on obs_pre/obs_post and snap to the pre/post candidate sets. The
+    # forced-action replay (CX_REPLAY) still drives the trajectory; this only reads. Default off.
+    if os.environ.get("RQ2C") == "1":
+        for _env in envs:
+            _env._rq2c_model = model
+            _env._rq2c_vecnorm = vec_env
     _yeg_acts = [] if os.environ.get("YEG") == "1" else None  # Task-L STEP3 action log
     _yeg_ep_ends = [] if _yeg_acts is not None else None       # Task CX: action-index at each episode end
     _yeg_ep_completed = [] if _yeg_acts is not None else None  # True=completed, False=skipped (recon-synth bug)
+    # Task CX replay: feed the recorded action sequence instead of the policy (forced-action replay, Task L
+    # verified byte-identical). Consumes actions in order; the env reproduces the same episodes deterministically.
+    _replay = None; _ri = 0
+    if os.environ.get("CX_REPLAY") == "1":
+        _replay = np.load(os.path.join(os.environ["CX_REPLAY_ACTIONS_DIR"], f"eventgraph_{band_label}", f"actions_s{seed}.npy"))
     while (n_episodes_completed + n_episodes_skipped) < max_episodes:
+        if _replay is not None and _ri >= len(_replay):
+            break
         try:
-            with torch.no_grad():
-                action, _ = model.predict(state)
+            if _replay is not None:
+                action = _replay[_ri:_ri + 1]; _ri += 1
+            else:
+                with torch.no_grad():
+                    # Task RQ2C live rollout: the stored attenuation_step3_logs actions are NOT
+                    # faithfully replayable (that sweep was recorded without per-seed seeding; only a
+                    # distributional <1pp reproduction was ever checked, never a trajectory-identical
+                    # one -- see the replay-fidelity scope correction). So RQ2C generates a FRESH
+                    # rollout of the SAME checkpoint under the SAME attenuation config and computes the
+                    # counterfactual inline. The trajectory uses STOCHASTIC action selection (the
+                    # regime that actually produces membership_leave events -- the deterministic policy
+                    # discovers ~nothing and fires 0 leaves), made reproducible by the per-seed seeding
+                    # block in collect_band_data (torch.manual_seed + set_num_threads(1) +
+                    # PYTHONHASHSEED=0). The COUNTERFACTUAL pre/post predicts stay deterministic=True
+                    # inside _rq2c_probe -- that is where "no stochastic sampling" matters (a noise-free
+                    # before/after comparison). So no deterministic override on the trajectory here.
+                    action, _ = model.predict(state)
             if _yeg_acts is not None:
                 _yeg_acts.append(np.asarray(action[0], dtype=np.float32).copy())
             state, reward, done, info = vec_env.step(action)

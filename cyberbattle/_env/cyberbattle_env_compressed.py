@@ -679,9 +679,30 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 "distinct_max_holders": d_max,
                 "distinct_min_holders": d_min,
             }
+        # Task CX replay probe (gated; read-only): pre-change per-node embeddings + node vuln/service state.
+        _rp_pre = None
+        if os.environ.get("CX_REPLAY_PROBE") == "1":
+            _rp_pre = {
+                "ne": dict(self.node_embeddings),
+                "state": {n: (len(self.get_node(n).vulnerabilities), len(self.get_node(n).services),
+                              sum(1 for s in self.get_node(n).services if s.running))
+                          for n in self.discovered_nodes if n in self.environment.nodes},
+            }
+        # Task RQ2C pre-change capture (gated; read-only): the observation and the candidate-action
+        # embeddings AS THEY STAND BEFORE the churn, so the policy's pre-change preferred action can
+        # be snapped against the pre-change candidate set. Copies only; no RNG draw, no state mutation.
+        _rq2c_pre = None
+        if os.environ.get("RQ2C") == "1" and getattr(self, "_rq2c_model", None) is not None:
+            _rq2c_pre = {
+                "obs": {"graph_embeddings": np.array(self.observation["graph_embeddings"], dtype=np.float32).copy(),
+                        "discrete_features": np.array(self.observation["discrete_features"], dtype=np.float32).copy()},
+                "action_emb": dict(self.action_embeddings),
+            }
         nodes_changed = self.maybe_apply_dynamic_step()  # removed and/or joined node IDs this step
         # h2->h3 window events (property/membership_leave/membership_join), if any fired this step
         dynamic_events = list(self._last_dynamic_events)
+        if _rp_pre is not None and dynamic_events:
+            self._cx_replay_probe(_rp_pre, dynamic_events)
         if nodes_changed:
             # a node was removed or joined after the observation/action space were already built
             # this step; re-encode and rebuild so we do not hand back a stale observation or action space
@@ -691,6 +712,15 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 "discrete_features": self.create_discrete_features()
             }
             self.create_continuous_action_space()
+
+        # Task RQ2C: after the churn re-encoded obs_post and rebuilt the post candidate set, run the
+        # counterfactual for each single-node membership_leave that fired this step. Read-only +
+        # RNG-guarded; only active when the driver has attached the model/vecnormalize (RQ2C=1).
+        if _rq2c_pre is not None and dynamic_events:
+            _rq2c_leaves = [e for e in dynamic_events
+                            if e["change_type"] == "membership_leave" and len(e["node_ids"]) == 1]
+            if _rq2c_leaves:
+                self._rq2c_probe(_rq2c_pre, _rq2c_leaves, len(_rq2c_leaves))
 
         info = StepInfo(
             description='CyberBattleEnvCompressed step info',
@@ -826,6 +856,120 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         n_max = len({int(i) for i in np.argmax(M, axis=0)})
         n_min = len({int(i) for i in np.argmin(M, axis=0)})
         return n_max, n_min
+
+    # Task CX replay probe: per change-event, log whether a DEPARTING node itself held a coordinate extreme
+    # (assumption-free vs the D/n null) and, for property events, the node's PRE-change vuln/service state
+    # (the property-zero cause). Read-only; writes its own JSONL. Only active under CX_REPLAY_PROBE.
+    def _cx_replay_probe(self, pre, events):
+        import json
+        if getattr(self, "_cx_rp_f", None) is None:
+            d = os.environ.get("CX_REPLAY_PROBE_DIR", ".")
+            os.makedirs(d, exist_ok=True)
+            self._cx_rp_f = open(os.path.join(d, f"probe_{self.drift_run_id}_{self.drift_scenario_id}.jsonl"), "a")
+        pre_ne, pre_state = pre["ne"], pre["state"]
+        ids = list(pre_ne.keys())
+        argmax = argmin = set(); idx = {}
+        if len(ids) >= 2:
+            M = np.stack([np.asarray(pre_ne[n], dtype=np.float32) for n in ids])
+            argmax = {int(i) for i in np.argmax(M, axis=0)}; argmin = {int(i) for i in np.argmin(M, axis=0)}
+            idx = {n: i for i, n in enumerate(ids)}
+        for ev in events:
+            ct = ev["change_type"]; nid = ev["node_ids"][0] if ev["node_ids"] else None
+            rec = {"run_id": self.drift_run_id, "scenario": self.drift_scenario_id,
+                   "episode": self._episode_count, "step": self.stepcount, "change_type": ct,
+                   "node_id": (None if nid is None else str(nid)), "n_touched": len(ev["node_ids"])}
+            if ct == "membership_leave":
+                rec["discovered"] = int(nid in idx)
+                if nid in idx:
+                    rec["departing_held_max"] = int(idx[nid] in argmax)
+                    rec["departing_held_min"] = int(idx[nid] in argmin)
+            if ct in ("property", "property_substitution") and nid in pre_state:
+                v, s, r = pre_state[nid]
+                rec["pre_n_vulns"] = v; rec["pre_n_services"] = s; rec["pre_n_running"] = r
+            self._cx_rp_f.write(json.dumps(rec) + "\n")
+        self._cx_rp_f.flush()
+
+    # Task RQ2C: does the chosen action follow the VIEW, or only the action SET? For each single-node
+    # membership_leave, predict the policy's continuous output on obs_pre and obs_post (deterministic,
+    # torch.no_grad) and snap each to the pre/post candidate set via find_closest_action_embedding.
+    # Candidate identity = (source, target, vulnerability_ID, type(outcome).__name__) -- a stable tuple
+    # within one process, NOT the (disclosed-stale) numeric embedding, so group assignment is exact.
+    #   GROUP (i)  = the pre-change preferred action is no longer in the post candidate set (removed).
+    #   GROUP (ii) = still present -> did the actual choice change (changed = post_key != pre_key).
+    # Fully read-only: reuses the already-built pre/post action_embeddings (never re-enumerates), and
+    # snapshots+restores random/numpy/torch RNG around the two predicts+snaps so the diagnostic
+    # consumes no net RNG and the forced-replay trajectory is byte-identical. Only active when the
+    # driver attached _rq2c_model/_rq2c_vecnorm (RQ2C=1); default path (env var unset) never runs.
+    def _rq2c_probe(self, pre, leave_events, n_qual):
+        import json, random as _random
+        model = getattr(self, "_rq2c_model", None)
+        vecn = getattr(self, "_rq2c_vecnorm", None)
+        if model is None or vecn is None:
+            return
+        pre_emb = pre["action_emb"]
+        post_emb = self.action_embeddings
+        n_pre, n_post = len(pre_emb), len(post_emb)
+
+        def _idkey(k):
+            return (str(k[0]), str(k[1]), str(k[2]), type(k[3]).__name__)
+
+        st_py, st_np, st_th = _random.getstate(), np.random.get_state(), torch.get_rng_state()
+        try:
+            with torch.no_grad():
+                cont_pre, _ = model.predict(vecn.normalize_obs(pre["obs"]), deterministic=True)
+                cont_post, _ = model.predict(vecn.normalize_obs(self.observation), deterministic=True)
+            cont_pre = np.asarray(cont_pre, dtype=np.float32).reshape(-1)
+            cont_post = np.asarray(cont_post, dtype=np.float32).reshape(-1)
+            emb_dist = float(np.linalg.norm(cont_post - cont_pre))
+            pre_key = post_key = None
+            dist_pre = dist_post = None
+            if n_pre > 0:
+                saved = self.action_embeddings
+                self.action_embeddings = pre_emb  # snap obs_pre against the PRE candidate set
+                s, t, v, o, dist_pre = self.find_closest_action_embedding(cont_pre, no_output=True)
+                self.action_embeddings = saved     # restore the real post set immediately
+                pre_key = _idkey((s, t, v, o))
+            if n_post > 0:
+                s, t, v, o, dist_post = self.find_closest_action_embedding(cont_post, no_output=True)
+                post_key = _idkey((s, t, v, o))
+            post_idset = {_idkey(k) for k in post_emb.keys()}
+        finally:
+            _random.setstate(st_py); np.random.set_state(st_np); torch.set_rng_state(st_th)
+
+        if getattr(self, "_rq2c_f", None) is None:
+            d = os.environ.get("RQ2C_DIR", ".")
+            os.makedirs(d, exist_ok=True)
+            self._rq2c_f = open(os.path.join(d, f"rq2c_{self.drift_run_id}_{self.drift_scenario_id}.jsonl"), "a")
+        for ev in leave_events:
+            nid = ev["node_ids"][0]
+            if n_pre == 0:
+                excl = "no_candidate_pre"
+            elif n_post == 0:
+                excl = "no_candidate_post"
+            else:
+                excl = None
+            pre_in_post = (excl is None) and (pre_key in post_idset)
+            group = changed = None
+            if excl is None:
+                if pre_in_post:
+                    group = "ii"; changed = int(post_key != pre_key)
+                else:
+                    group = "i"
+            rec = {
+                "run_id": self.drift_run_id, "scenario": self.drift_scenario_id,
+                "episode": self._episode_count, "step": self.stepcount,
+                "node_id": str(nid), "n_qualifying_events_this_step": n_qual,
+                "n_candidate_pre": n_pre, "n_candidate_post": n_post,
+                "excluded": excl, "group": group, "changed": changed,
+                "pre_in_post": (bool(pre_in_post) if excl is None else None),
+                "chosen_pre": (list(pre_key) if pre_key is not None else None),
+                "chosen_post": (list(post_key) if post_key is not None else None),
+                "dist_pre": (float(dist_pre) if dist_pre is not None else None),
+                "dist_post": (float(dist_post) if dist_post is not None else None),
+                "emb_dist": emb_dist,
+            }
+            self._rq2c_f.write(json.dumps(rec) + "\n")
+        self._rq2c_f.flush()
 
     # h1/h2/h3 snapshot "from cache": reuses node_embeddings/observation already sitting in
     # self.* (because the production code path either just computed them at reset()/the start of
