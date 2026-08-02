@@ -39,23 +39,24 @@ Per single-node `membership_leave` event, computed LIVE during the rollout (env
   bootstrap 0.95 CI** (episode = resampling unit; the project convention — events within an episode are
   autocorrelated), reported **per band AND per seed**.
 
-## Data provenance (frozen snapshot 2026-08-02 ~23:15) [ARTIFACT]
+## Data provenance [ARTIFACT]
 
-Live rollout, 3 concurrent per-band jobs, `RQ2C=1 PYTHONHASHSEED=0`, writing `rq2c_replay/rq2c/rq2c_<band>_seed<seed>_<scenario>.jsonl`.
-**The run was WALL-CLOCK-TRUNCATED at the session deadline**, not run to the full 400-ep/seed budget
-(the big bands do not early-stop — `membership_join` never reaches its 200-event target — so they would
-run the full 2000 episodes/band; they were stopped after seed 42):
+Live rollout, per-band jobs, `RQ2C=1 PYTHONHASHSEED=0`, writing `rq2c_replay/rq2c/rq2c_<band>_seed<seed>_<scenario>.jsonl`.
+**All three bands complete, all 5 seeds** (10-15 collected 2026-08-02; 30-40 and 80-100 completed
+2026-08-03):
 
-| band | seeds completed | leave records | status |
+| band | seeds completed | leave records | stopping rule |
 |---|---|---|---|
-| 10-15 | **42, 100, 123, 200, 300 (all 5)** | 4965 | **complete** (all 5 seeds finished) |
-| 30-40 | 42 only | 3146 | **single-seed, partial** (killed mid-seed-42) |
-| 80-100 | 42 only | 2058 | **single-seed, partial** (killed mid-seed-42) |
+| 10-15 | 42, 100, 123, 200, 300 | 4965 | inherited all-change-type stop (completed fast on its own) |
+| 30-40 | 42, 100, 123, 200, 300 | 1483 | RQ2C leave-only stop: 200 relevant leaves/seed (~30 ep/seed) |
+| 80-100 | 42, 100, 123, 200, 300 | 2708 | RQ2C leave-only stop: 200 relevant leaves/seed (~30 ep/seed) |
 
-**Consequence for significance:** the project's standing rule is that the SEED is the unit for any
-across-condition claim. That is satisfied only for **10-15** (5 seeds, tight agreement). **30-40 and
-80-100 are single-seed point estimates** — their numbers are provisional and the cross-band SCALING
-trend is **suggestive, not seed-supported** at the two larger bands until their remaining seeds are run.
+**Stopping-rule note (immaterial to the rate).** 10-15's committed data used the inherited stop (waits for
+200 events of *every* change type); it happened to complete quickly. The big bands would otherwise run the
+full ~2000 ep/band because `membership_join` under-samples and never hits 200, so their re-run uses a gated
+**leave-only** stop (200 relevant `membership_leave`/seed — the natural target for a task that measures
+leaves). This changes per-seed SAMPLE SIZE, not the divergence RATE (a per-event quantity): 30-40/80-100 get
+~300/540 records/seed vs 10-15's ~1000. All three are now **5-seed, seed-supported**.
 
 ## RESULTS [ARTIFACT counts; FINDING = divergence rate]
 
@@ -63,40 +64,45 @@ Implausible-value check (mandatory) **PASSED**: rates are neither all-0 nor all-
 non-empty in every band (the identity/membership test is live, not silently matching); `emb_dist > 0`
 in **100%** of group-(ii) events in every band (the view genuinely moves); **0** excluded events.
 
-| band | n_group_i | n_group_ii | n_changed | **rate group-ii (FINDING)** | boot 0.95 CI | emb_dist mean/median |
+| band (5 seeds) | n_group_i | n_group_ii | n_changed | **rate group-ii (FINDING)** | boot 0.95 CI | emb_dist mean/median |
 |---|---|---|---|---|---|---|
-| 10-15 (5 seeds) | 1176 | 3789 | 1062 | **0.280** | [0.264, 0.296] | 2.81 / 1.19 |
-| 30-40 (seed 42) | 197 | 2949 | 307 | **0.104** | [0.092, 0.117] | 0.91 / 0.44 |
-| 80-100 (seed 42) | 18 | 2040 | 101 | **0.050** | [0.038, 0.060] | 0.45 / 0.13 |
+| 10-15 | 1176 | 3789 | 1062 | **0.280** | [0.264, 0.297] | 2.81 / 1.19 |
+| 30-40 | 101 | 1382 | 167 | **0.121** | [0.098, 0.144] | 1.12 / 0.51 |
+| 80-100 | 27 | 2681 | 121 | **0.045** | [0.037, 0.053] | 0.45 / 0.12 |
 
-Per-seed (10-15 only has the full set): 0.235 / 0.273 / 0.278 / 0.331 / 0.284 (seeds 42/100/123/200/300)
-— consistent, spread 0.235–0.331. 30-40 seed42 = 0.104; 80-100 seed42 = 0.050.
+**Per seed (the across-condition significance unit) — monotone ordering holds, distributions barely overlap:**
+- 10-15: 0.235 / 0.273 / 0.278 / 0.331 / 0.284 (range 0.235–0.331)
+- 30-40: 0.099 / 0.156 / 0.053 / 0.161 / 0.124 (range 0.053–0.161) — entirely below 10-15's range
+- 80-100: 0.038 / 0.060 / 0.029 / 0.060 / 0.040 (range 0.029–0.060) — below 30-40's mean, minimal overlap
+Seeds ordered 42/100/123/200/300. **The cross-band scaling trend is now seed-supported**, not a single-seed artefact.
 
 ## FINDING — behaviour follows the ACTION SET, and does so more with scale [FINDING]
 
 When the agent's preferred target **survives** a membership change — the overwhelming majority of leaves
-(group-ii share = 76% / 94% / 99% at 10-15 / 30-40 / 80-100) — its chosen action **usually stays the
-same**: the group-(ii) divergence rate is **0.280 / 0.104 / 0.050**, i.e. the choice is unchanged in
-**72% / 90% / 95%** of surviving-preferred cases. So **behaviour predominantly follows the action set
+(group-ii share = 76% / 93% / 99% at 10-15 / 30-40 / 80-100) — its chosen action **usually stays the
+same**: the group-(ii) divergence rate is **0.280 / 0.121 / 0.045**, i.e. the choice is unchanged in
+**72% / 88% / 95%** of surviving-preferred cases. So **behaviour predominantly follows the action set
 (candidate-set membership), not the view**, and this dominance **strengthens monotonically with network
-size**. The view is **not inert** — every CI excludes 0, and at the smallest band ~28% of surviving-action
-events do change choice — but its behavioural influence **shrinks sharply with scale** (0.28 → 0.10 → 0.05).
+size** — and it is now **seed-supported**: the per-seed divergence distributions (10-15 [0.235,0.331],
+30-40 [0.053,0.161], 80-100 [0.029,0.060]) are monotonically ordered with minimal overlap. The view is
+**not inert** — every CI excludes 0, and at the smallest band ~28% of surviving-action events do change
+choice — but its behavioural influence **shrinks sharply with scale** (0.28 → 0.12 → 0.05).
 
 The action-set channel itself also collapses with scale: group (i) "preferred action removed" is
-**23.7% / 6.3% / 0.9%** of all single-node leaves — at 80-100 a departing node is almost never the target
+**23.7% / 6.8% / 1.0%** of all single-node leaves — at 80-100 a departing node is almost never the target
 the policy currently wants, so the leave rarely even removes the preferred action. Net at 80-100: a
-membership leave changes the agent's action in only ~6.5% of cases total (0.9% removal + 5.0%×99% view),
+membership leave changes the agent's action in only ~5.5% of cases total (1.0% removal + 4.5% view),
 despite the view moving in 100% of them — a near-complete decoupling of view movement from behaviour at scale.
 
 **RQ2(c) answer:** the change moves behaviour **primarily through the action set, not the view**, and the
 view's residual influence **diminishes with scale** — consistent with the attenuation story (larger pools
-swallow more of the per-node change before it reaches behaviour). Weight-bearing at 10-15 (5 seeds);
-provisional single-seed at 30-40/80-100 pending their remaining seeds.
+swallow more of the per-node change before it reaches behaviour). **Weight-bearing: 5 seeds per band, the
+scaling trend seed-supported.**
 
 ## Caveats
-- **30-40 / 80-100 are single-seed (seed 42), wall-clock-truncated** — provisional; re-run the remaining
-  4 seeds/band to make the scaling claim seed-supported.
 - 80-100 agent not confirmed converged (Task F4) — its low divergence partly reflects a weaker policy.
+- 10-15 used the inherited all-change-type stop, 30-40/80-100 the RQ2C leave-only stop (see provenance) —
+  a per-seed sample-size difference, not a rate difference.
 - group (i) carries no choice-changed metric by construction (original choice unavailable to reselect).
 - Uses the disclosed action-embedding **staleness** (Task L) as-is: the group assignment is by candidate
   IDENTITY (the tuple), so staleness does not affect it; it only affects the numeric snap distance, an
