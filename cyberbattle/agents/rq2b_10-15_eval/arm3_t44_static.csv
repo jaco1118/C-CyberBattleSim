@@ -1,0 +1,6 @@
+arm,topo,condition,run_id,seed,mean_root_owned,n_episodes
+3,44,static,1,42,9.815,200
+3,44,static,2,100,9.725,200
+3,44,static,3,123,9.655,200
+3,44,static,4,200,9.57,200
+3,44,static,5,300,9.765,200
