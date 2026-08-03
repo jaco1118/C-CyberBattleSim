@@ -24,6 +24,7 @@ import torch
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
+from cyberbattle.agents.extremal_mask import ExtremalMask  # RQ2B/Task-Z Arm-3 (gated; default off)
 import re
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, project_root)
@@ -128,9 +129,15 @@ def train_model(train_envs, logs_folder, config, run_id, val_envs=None, logger=N
     # the algorithm is actually configured with)
     vecnormalize_gamma = algorithm_config.get('gamma', 0.99)
     train_envs = VecNormalize(train_envs, norm_obs=config['norm_obs'], norm_reward=config['norm_reward'], gamma=vecnormalize_gamma)
+    # RQ2B/Task-Z Arm 3 (gated, default off): hold the 128 extremal pooled dims constant, OUTSIDE
+    # VecNormalize so its running stats update on the raw obs (the Task-N post-normalisation fix).
+    if config.get('extremal_mask'):
+        train_envs = ExtremalMask(train_envs)
     if val_envs:
         val_envs = DummyVecEnv([lambda: Monitor(val_envs)])
         val_envs = VecNormalize(val_envs, norm_obs=config['norm_obs'], norm_reward=False, gamma=vecnormalize_gamma)
+        if config.get('extremal_mask'):
+            val_envs = ExtremalMask(val_envs)
 
     if verbose:
         logger.info(f"Normalization of observations: {config['norm_obs']}")
@@ -638,6 +645,7 @@ if __name__ == "__main__":
     parser.add_argument('--static_seeds', action='store_true', default=False, help='Use a static seed for training')
     parser.add_argument('--load_seeds', default="config", help='Path of the folder where the seeds.yaml should be loaded from (e.g. previous experiment)')
     parser.add_argument('--random_seeds', action='store_true', default=False, help='Use random seeds for training')
+    parser.add_argument('--extremal_mask', action='store_true', default=False, help='RQ2B/Task-Z Arm 3: hold graph_embeddings[64:192] constant at 0.0 post-VecNormalize (default off)')
     parser.add_argument('--static_defender_agent', default=None, choices=['reimage', 'events', None], help='Static defender agent to use')
     parser.add_argument('-pca', '--pca_components', default=None, type=int,
                         help='Invoke with the use of PCA for the feature vectors specifying the number of components')
