@@ -1,0 +1,696 @@
+diff --git a/evidence_cards/evidence_taskAN.md b/evidence_cards/evidence_taskAN.md
+index 80cef20..11b595e 100644
+--- a/evidence_cards/evidence_taskAN.md
++++ b/evidence_cards/evidence_taskAN.md
+@@ -235,3 +235,59 @@ response-rate decline is a pure counting effect (the departing node stops holdin
+ pool grows) at ANY plausible p; only the SIZE of that arithmetic part — and hence the sign of the residual —
+ is open.** This is the statement the manuscript can make now: the decline is *not* a clean encoder finding;
+ it is arithmetic plus an undetermined residual.
++
++## EFFECTIVE-p MEASURED (Task CX PART 1, 2026-08-02) — CONCLUSION NO LONGER WITHHELD: residual is POSITIVE
++The missing quantity — the number of DISTINCT nodes holding >=1 coordinate-wise extreme per event — is now
++logged in the CX registration run (`distinct_max_holders`/`distinct_min_holders`, present on 100% of records).
++Computed on DISCOVERED-leave events only (the AN framework: the departing node must be a discovered node);
++null(departing node holds >=1 extreme) under a uniform departing node = D/n (D distinct holders of n_discovered
++nodes) = the effective-p null 1-(1-1/n)^p_eff; observed = change_drift_{max,min}>0 on `touched_node_visible=True`
++leaves.
++
++| band | mean n_disc | mean D (max) | **effective p (max)** | observed max | expected(null) | **diff** | observed min | expected | diff |
++|---|---|---|---|---|---|---|---|---|---|
++| 10-15 | 8.8 | 7.7 | **16.8** | 92.5% | 87.5% | **+5.0pp** | 91.8% | 87.1% | +4.7pp |
++| 30-40 | 26.8 | 14.4 | **20.2** | 72.9% | 54.5% | **+18.4pp** | 68.3% | 54.2% | +14.0pp |
++| 80-100 | 74.9 | 18.9 | **21.6** | 40.7% | 25.6% | **+15.1pp** | 28.4% | 24.7% | +3.7pp |
++
++- **Measured effective p ≈ 17–22** — far below the **p=64 UPPER BOUND** the card used, and below the **p~32** it
++  flagged as the sign-flip point. 64 extremal coordinates are held by only ~17–22 distinct nodes (strongly
++  correlated, as message passing predicts). Effective p is roughly scale-invariant across bands.
++- **SIGN NOW DETERMINED: POSITIVE at every band and both slices** (+3.7 to +18.4 pp). At the measured effective
++  p the null falls BELOW the observed rate, so **observed exceeds the arithmetic null** — the extremal-slice
++  response is NOT explained by the arithmetic (departing-node-held-an-extreme) null alone. The excess is the
++  message-passing/PROPAGATION component (Task P: the max/min slice moves via 2-hop propagation even when the
++  departing node held no extreme). This resolves the earlier ambiguity, which existed only because p=64 (upper
++  bound) put the null ABOVE observed (spurious negative residual).
++- **Caveats carried:** (i) the null assumes a UNIFORM departing node; the actual selection is inverse-degree
++  weighted (Task P — low-degree nodes preferentially removed, propagate LESS), which biases observed DOWN, so
++  the true excess is >= what is measured → the positive sign is ROBUST to that bias. (ii) CX observed (40.7% at
++  80-100) matches the reported-corpus 43.0 closely, so the resolution transfers; but CX is the uncapped-join /
++  undiscovered-removal condition, so the absolute observed rates are the CX condition's, not the reported run's.
++  (iii) the min slice at 80-100 (+3.7pp) is the smallest margin; positive but modest.
++
++### PART 1 follow-ups (2026-08-02) — conclusion SOFTENED: positive under the uniform null, NOT settled assumption-free
++1. **Two opposing selection biases, net undetermined.** The D/n null assumes a UNIFORM departing node, but
++   selection is inverse-degree weighted. (A) low-degree nodes propagate LESS (Task P) → preferentially removed
++   → biases OBSERVED down → excess larger; (B) low-degree nodes are LESS smoothed → may hold extremes MORE →
++   raises the correct null FOR THE REMOVED population → excess smaller/could flip. Both real, they oppose, and
++   the net cannot be measured from existing logs. So the earlier "sign determined = positive" is **only true
++   under the uniform-draw null**; assumption-free it is NOT settled. Sensitivity: at 80-100 (excess +15pp on a
++   25.6% null), if the removed low-degree nodes hold extremes ~1.6× the average rate the null reaches ~41% and
++   the sign flips — so the sign is NOT robust to a strong direction-(B) effect.
++2. **The assumption-free comparison (STEP 2.1) CANNOT be done from existing data.** Per-event fields are
++   change_type + changed_node_{id,degree,discovered,owned,root} + distinct_{max,min}_holders (COUNT only); there
++   is **NO per-event flag for whether the DEPARTING node itself held an extreme**, and the drift CSV has no such
++   column. STEP 2.1 (observed slice-moved rate vs measured departing-node-held-an-extreme rate, same events)
++   needs the per-node argmax at each event → **forced-action replay** (re-encode the logged evolving_visible_graph;
++   node features aren't logged and change under patch_service, so replay, not re-read). Replay is beyond
++   "analysis on existing data"; it is the recovery path and would settle (1) outright.
++3. **At the REPORTED n_discovered (6.3/22.6/70.5), using the measured effective p** (16.8/20.2/21.6): null =
++   94.5% / 59.9% / 26.6% vs reported observed 98.5 / 84.0 / 43.0 → diff **+4.0 / +24.1 / +16.4 pp** (positive,
++   under the uniform null). **D does NOT transfer** (D_cx/n_rep = 1.22 at 10-15 > 1, impossible since D≤n); only
++   the **effective p** is transferred, as a scale-invariant property. **Basis for the transfer (stated, not
++   assumed silently):** effective p is ~invariant across the CX bands (17–22 despite n 9→75), the encoder is
++   FROZEN and identical in both conditions, and n_discovered is close (26.8 vs 22.6; 74.9 vs 70.5). **Caveat:**
++   the CX discovered graphs differ in composition (uncapped join adds joined nodes; undiscovered removal), so
++   the effective p is NOT verified under the reported condition — the reported-n resolution is SUGGESTIVE,
++   contingent on this transfer. At 10-15 the reported null saturates (~94–99%), so that band is uninformative.
+diff --git a/evidence_cards/evidence_taskCX.md b/evidence_cards/evidence_taskCX.md
+index 6f92f32..8ef3456 100644
+--- a/evidence_cards/evidence_taskCX.md
++++ b/evidence_cards/evidence_taskCX.md
+@@ -276,3 +276,591 @@ Two independent reasons, the second harder than the first:
+ So the two sets of cost figures **measure different systems under different protocols; neither replaces the
+ other**. CX's cost is computed against its OWN matched static arm (same adapted checkpoints, `dynamic_mode=none`,
+ same topologies/seeds/budget/protocol), run concurrently — never against F1/F2's numbers.
++
++## STEP 2 AUTONOMOUS SESSION (2026-08-01/02, overnight) — 10-15 checks + B.0 stop [FINDING]
++
++### Three preconditions on completed band 10-15 (CX + static arms) — ALL PASS → runs continue
++- **Check 1 (property targeting): PASS.** CX 10-15: **6,996 property events, all `changed_node_discovered=1`, 0 undiscovered** — `allow_undiscovered_property` correctly off, internal control intact.
++- **Check 2 (static zero events): PASS.** static 10-15 event_graph: **0 change events** of any type.
++- **Check 3 (static null control): PASS.** static 10-15 drift CSV (470,078 rows): `change_drift_full/mean/max/min` **max|·| = 0.000e+00, zero nonzero rows**, `change_fired` all False. The disturbance-response drift is exactly zero → the post-cleanup null control re-validated. (`agent_drift_full` max 4.73 and `delta_h_v_norm` max 0.95 on `event_phase='attributed'`, `change_fired=False` rows are the AGENT's OWN drift — noise floor + normal node discovery — nonzero by design in every run incl. reported; NOT the disturbance response. My first lumped-max read wrongly included them.)
++- Minor: the "0 seeds finished" reading earlier was a **log-string mismatch** ("data collection finished" not matching), not a stall — progress confirmed via the `eventgraph_{band}/s{seed}_*` dirs (10-15 done, 30-40 underway).
++
++### Task B (F4 STEP 2) B.0 gate — STOP, Task B HELD (per pre-registered stop conditions)
++The original **F2/F3 cost-eval harness is unrecoverable**: F2 card:15 "No repo code changes (HEAD e714f53); scripts in job scratch"; searches for any committed/on-disk cost-eval script (robustness = count(change)/count(static), root-owned) return **nothing**. `taskF2_cost_probe.py` in job tmp is a wall-clock **timing** probe, not the cost eval. Also: **no F2/F3 output CSVs found** (250k outputs not verifiably intact for the both-budgets comparison), and the **80-100 750k five-topology checkpoints not locatable**. So "the original F2/F3 protocol cannot be reproduced exactly" AND "the 250k outputs are not intact" — two stop conditions met. Reconstructing the lost ad-hoc harness from card prose would be a judgment call, forbidden by the overriding rule. **Task B not launched; CX + static left running.** Awaiting the user.
++
++## STEP 2/3.1 — CX + static arms COMPLETE: counts per cell, per band (COUNTS BEFORE RATES) [ARTIFACT]
++Both arms finished (3 bands × 5 seeds, 400 ep/seed, 0 skipped). Rates and the six-cell CONCLUSION are held
++for user review per the stop gate; only counts recorded here.
++
++**CX registration — events per cell (change-type × discovery):**
++| band | removal disc | removal undisc | addition disc | addition undisc | property disc | property undisc |
++|---|---|---|---|---|---|---|
++| 10-15 | 2,240 | 4,802 | **0** | 6,799 | 6,996 | 0 |
++| 30-40 | 6,941 | 20,125 | **0** | 26,183 | 25,485 | 0 |
++| 80-100 | 10,872 | 21,381 | **0** | 31,472 | 29,353 | 0 |
++
++- **addition-DISCOVERED = 0 in ALL three bands** — the pre-flagged thin cell is EMPTY: a joined node is
++  never discovered within its own episode at any band (consistent with OI-1/RQ2c "may never perceive them").
++  Not a rule-6 stop (bands are event-rich); not a contradiction of prediction 5.3 (which needs data to test).
++  It means the five-cell table is effectively **four populated cells** (removal×2, addition-undisc,
++  property-disc) + addition-disc empty + property-undisc NOT RUN (inherited). Report explicitly.
++- property is **100% discovered** every band (0 undiscovered) — control intact across all bands.
++- membership_join hit budget-exhausted shortfall at 80-100 (94–127 of 200 target) — under-sampling, expected.
++
++**Static arm assertions (matched baseline) — PASS all bands:** 10-15 / 30-40 / 80-100 each: **0 change
++events**, `max|change_drift| = 0.0`. Nothing-changes holds; null control re-validated across the full set.
++
++**HELD for user review (stop gate):** the five/six-cell RESPONSE RATES, the membership-vs-property control,
++and the pooled-rate-vs-discovered-share (5.6). Not computed here — awaiting the counts-review gate.
++
++## PART 2 — the registration rates (2026-08-02) [FINDING]. Counts first; deviations flagged first.
++
++### DEVIATIONS FROM THE PRE-REGISTERED PREDICTIONS (reported first)
++- **5.5 property is NOT exactly 1.000 sd 0.000.** Property own-registration = 0.998 / 0.987 / 0.996 (seed sd
++  0.003 / 0.018 / 0.004); exactly-zero own contributions = 14 / 330 / 130 property events (~1–1.3%). Property
++  registers **near** 1.000, not exactly. Small deviation; likely a patched vuln whose removal left the node's
++  pooled embedding unchanged (not investigated further).
++- **5.2 undiscovered removal is exactly 0 for SINGLE-node events; the 2.3/2.4/3.1% nonzero are 100% BATCH events.**
++  Every nonzero undiscovered-removal row has `n_touched_nodes>1` (229/229, 1042/1042, 1402/1402) — batch removals
++  that also touched a DISCOVERED node, so `delta_h_v` reflects that discovered node. NOT an Appendix-B-class
++  "undiscovered node registers" defect. Single-node undiscovered removal = exactly 0.00e+00.
++- **5.6 pooled membership response is +2pp ABOVE the discovered share, not equal** — the +2pp = the same
++  batch-mixed excess. Holds up to the batch artifact.
++
++### 2.2 — five populated cells (property × not-discovered = NOT RUN, inherited discovered-only targeting)
++Own-registration = fraction with per-event own contribution delta_h_v>0 (NOT the step-level column). Per-slice
++change rates are the step-level pooled change (appropriate for a pooled quantity).
++
++| band | cell | count | own-reg | own=0 | change_drift full / mean / max / min |
++|---|---|---|---|---|---|
++| 10-15 | removal×disc | 2,131 | 1.000 | 0 | 1.000 / 1.000 / 0.925 / 0.918 |
++| 10-15 | removal×undisc | 9,881 | 0.023* | 9,652 | 0.044 / 0.044 / 0.042 / 0.041 (*all batch) |
++| 10-15 | addition×subsq-disc | 1,049 | 1.000 | 0 | N/A (h1→h2 attribution) |
++| 10-15 | addition×never | 12,817 | **0.000** | 12,817 | 0 |
++| 10-15 | property×disc | 6,996 | 0.998 | 14 | 0.998 / 0.998 / 0.962 / 0.949 |
++| 30-40 | removal×disc | 6,479 | 1.000 | 0 | 1.000 / 1.000 / 0.729 / 0.683 |
++| 30-40 | removal×undisc | 42,816 | 0.024* | 41,774 | 0.047 / 0.047 / 0.037 / 0.036 |
++| 30-40 | addition×subsq-disc | 929 | 1.000 | 0 | N/A |
++| 30-40 | addition×never | 54,490 | **0.000** | 54,490 | 0 |
++| 30-40 | property×disc | 25,485 | 0.987 | 330 | 0.987 / 0.987 / 0.759 / 0.752 |
++| 80-100 | removal×disc | 10,174 | 1.000 | 0 | 1.000 / 1.000 / 0.407 / 0.284 |
++| 80-100 | removal×undisc | 45,861 | 0.031* | 44,459 | 0.052 / 0.052 / 0.024 / 0.021 |
++| 80-100 | addition×subsq-disc | 541 | 1.000 | 0 | N/A |
++| 80-100 | addition×never | 66,222 | **0.000** | 66,222 | 0 |
++| 80-100 | property×disc | 29,353 | 0.996 | 130 | 0.996 / 0.996 / 0.424 / 0.411 |
++
++Extremal attenuation visible in the per-slice max/min change rates: removal×disc max declines 0.925→0.729→0.407
++with band; property×disc max 0.962→0.759→0.424. Mean slice stays 1.000/0.99. (The full-vector and mean-slice
++rates confirm the discovered-change registration; the max/min decline is the attenuation the study is about.)
++
++### 2.3 internal control — membership FALLS, property STAYS
++| band | membership own-response (seed sd) | property own-response (seed sd) |
++|---|---|---|
++| 10-15 | 0.198 (0.013) | 0.998 (0.003) |
++| 30-40 | 0.154 (0.016) | 0.987 (0.018) |
++| 80-100 | 0.207 (0.007) | 0.996 (0.004) |
++Membership falls to ~the discovered share (0.15–0.21); property, which experienced every other feature of the
++condition (uncapped joins, churn, mixing), stays ~0.99. So the membership fall is attributable to discovery
++status, not to the condition. Property does NOT also fall → the account is not contradicted. (Property is ~0.99
++not exactly 1.000 — the 5.5 deviation above.)
++
++### 2.4 point prediction (5.6), per-event flag (touched_node_visible) for the share
++| band | pooled membership own-response | observed discovered share | diff |
++|---|---|---|---|
++| 10-15 | 0.196 | 0.177 | +0.019 |
++| 30-40 | 0.153 | 0.131 | +0.021 |
++| 80-100 | 0.207 | 0.182 | +0.025 |
++Pooled ≈ discovered share, +2pp (= the batch-mixed excess). Not materially above → no non-discovery mechanism
++moving the vector on undiscovered removals beyond batch mixing.
++
++### 2.5 six predictions: 5.1 MET (removal×disc 1.000); 5.2 MET single-node (batch caveat); 5.3 MET (join
++subsq-disc 1.000); 5.4 MET exactly (join never-disc 0.000); **5.5 DEVIATED** (property 0.99 not exactly 1.000
++sd 0.000); **5.6 DEVIATED by +2pp** (batch-explained).
++
++### 2.6 co-firing: rows n_touched>1 = 3.4/3.8/4.0%; steps with >1 change TYPE = 5.0/5.3/5.3%. Every registration
++conclusion above used the PER-EVENT own contribution (delta_h_v_norm), not the step-level change_drift column.
++
++### 2.7 joins ever discovered within episode (result in its own right)
++1,049 / 929 / 541 = **15.4% / 3.5% / 1.7%** of joins; median visibility lag **17 / 21 / 26 steps**. Both move
++with scale in the same direction (fewer discovered, later, at larger bands). **NOT comparable to the previously
++reported 92.0%** — joins were CAPPED then and UNCAPPED here, so the denominators are different populations.
++
++## PART 2 corrections (2026-08-02, post-review) [FINDING]
++1. **Property zeros — MEASURED (partly): truly inert, cause needs replay.** 14/330/130 property zeros are ALL
++   `change_type='property'` (patch/service; 0 substitution events under change_type=mixed), **none co-fire**, and
++   the **pool did not move either** (`change_drift_full`=0 among them) — genuinely inert changes, not co-firing
++   masking. Feature vector = vuln-mean embedding + service-running bit + service-fv mean (`convert_node_info_to_
++   observation`), so a zero means the specific patch/service left all three unchanged. **Which of the three
++   hypotheses holds per event (zero-vuln node / absent service / identical refreshed cache) is NOT in the logs**
++   (node vuln-count/service-state at the event unrecorded) → replay question. NOT assumed (Appendix-B lesson).
++2. **Undiscovered cells are exactly 0 (single-node); batch is a separate instrumentation line.** removal×undisc
++   SINGLE-node: n=9,395/40,579/43,255, own-reg **0.0000 exactly**; addition×never single-node **0.0000 exactly**.
++   Batch (n_touched>1, mixed with a discovered node): 486/2,237/2,606 events = 4.9/5.2/5.7% of undisc rows — an
++   instrumentation artifact of multi-node events, reported separately, NOT a contaminated cell rate.
++3. **The 52/65/78 discovered-share forecast was wrong INPUT; the relationship holds.** That forecast used
++   n_discovered / STATIC band size; uncapped joins grow the network within an episode, so the true denominator
++   is larger and the observed share much lower (17.7/13.1/18.2%). The pre-registered RELATIONSHIP — pooled
++   membership response = observed discovered share — is CONFIRMED to within the +2pp batch excess. Prediction
++   confirmed; forecast input wrong.
++4. **RQ3(b) ANSWERED (finding in its own right): two different operations, same attenuation.** MAX-slice change
++   rate: removal×disc **0.925 / 0.729 / 0.407** vs property×disc **0.962 / 0.759 / 0.424** — parallel decline,
++   same shape; change type adds essentially nothing beyond structure (n/band) on the max slice. MIN slice:
++   removal 0.918/0.683/0.284 vs property 0.949/0.752/0.411 — tracks at 10-15/30-40 but property min stays higher
++   at 80-100 (0.411 vs 0.284), a modest operation difference at the largest band. So RQ3(b): the extremal
++   response is a structural (scale) property, largely operation-independent (cleanly so for max).
++
++## REPLAY COST (for the two open questions: PART-1 departing-node-held-extreme + property-zero node state)
++Forced-action replay from actions.npy (Task L verified byte-identical): 4,410 episodes across 3 bands × 5 seeds
++(640 / 1,770 / 2,000; ~151k / 533k / 602k steps, ~1.29M total). Re-steps each episode, re-encodes at each
++discovered-leave to compute (a) whether the departing node itself held an extreme, and (b) the property node's
++vuln/service state at zero-events. Estimated wall clock ≈ the eval cost (env stepping + encode dominate; saves
++policy inference, adds a cheap per-node argmax): **~2–4 h sequential, ~1.5 h if the 3 bands run concurrently**
++(CPU-bound, set_num_threads(1) → 1 core each, machine idle, no contention). One pass settles BOTH open items.
++
++## RQ3(b) RESTATED (2026-08-02, post-review) — a type effect DOES exist on the min slice at 80-100 [FINDING]
++Corrects the earlier "operation-independent" framing (which averaged the min-slice divergence away). The precise
++answer to RQ3(b) — "does change type explain anything beyond structure?":
++- **MAX slice: NO type effect at any band.** removal 0.925/0.729/0.407 vs property 0.962/0.759/0.424 — parallel,
++  same shape; the small constant offset is not a scale-dependent type effect.
++- **MIN slice: a MODEST type effect at the LARGEST band only.** removal 0.918/0.683/**0.284** vs property
++  0.949/0.752/**0.411** — tracks at 10-15 (0.92 vs 0.95) and 30-40 (0.68 vs 0.75) but DIVERGES at 80-100
++  (property min holds at 0.411 while removal min falls to 0.284, a 12.7pp gap) exactly where the max slice stays
++  parallel. So change type DOES have an effect, confined to the min slice at 80-100.
++- **Status: UNEXPLAINED pending the replay** (needs the per-node embeddings to see whether removals disturb the
++  min-holders differently from property changes at scale). Reported as unexplained, not averaged away.
++
++## PART 3 — cost from CX change arm vs matched static arm (2026-08-02) [FINDING]. Limitation first.
++
++### 3.1 INHERITED LIMITATION (stated before any number)
++CX evaluates the **250k gate checkpoints**. F4 (STEP 1.3) established 80-100 does NOT meet the convergence
++criterion even at 750k and is still rising. So this cost comparison STILL compares a converged smaller band
++against an **undertrained larger band** — switching to the reproducible CX pipeline inherits the confound, it
++does not remove it. Every robustness number below carries this.
++
++### 3.2 robustness, COUNT metric (final root-owned count), within band — counts first
++| band | n change ep | n static ep | change root | static root | cost (diff) | robustness |
++|---|---|---|---|---|---|---|
++| 10-15 | 640 | 2000 | 5.780 | 7.882 | 2.102 | **0.733** |
++| 30-40 | 1770 | 2000 | 19.039 | 23.099 | 4.061 | **0.824** |
++| 80-100 | 2000 | 2000 | 28.316 | 30.087 | 1.771 | **0.941** |
++Robustness RISES with band (0.733 → 0.824 → 0.941) — same direction as the headline finding — **but confounded
++by 3.1 (training) AND 3.6 (fractional churn), both below.**
++
++### 3.3 ownership ratio (root_owned/reachable) — CONTINUITY ONLY, NOT evidence, metric shown unreliable
++0.423 / 0.584 / 0.784 — same direction, lower than the count metric (ratio understates robustness, as F2).
++
++### 3.4 denominator movement
++Mean alive: 10-15 10.5→10.0, 30-40 33.0→32.4, 80-100 86.6→86.2 — the network barely moves and slightly
++**shrinks** (removal outpaces join on average), so the ratio denominator drifts DOWN, not up. The **count metric
++is unaffected** (root count is absolute) — stated explicitly.
++
++### 3.5 mechanical vs behavioural (from was_root / root_owned_departures)
++| band | total cost | mechanical (root departures/ep, seed sd) | behavioural | split |
++|---|---|---|---|---|
++| 10-15 | 2.102 | 1.616 (0.081) | 0.487 | **77% mech / 23% behav** |
++| 30-40 | 4.061 | 1.465 (0.191) | 2.596 | **36% / 64%** |
++| 80-100 | 1.771 | 0.498 (0.042) | 1.273 | **28% / 72%** |
++Behavioural FRACTION rises with band (23→64→72%): at the largest band most of the (small) cost is the agent
++failing to re-own, not roots taken away. **Caveat:** `root_owned_departures` counts GROSS departures (a root
++removed then re-owned counts as 1), so mechanical is an UPPER bound and behavioural a LOWER bound.
++
++### 3.6 FRACTIONAL CHURN (leave events / network size), beside robustness
++1.156 / 0.486 / 0.190 (leave/ep 11.0 / 15.3 / 16.1) — falls **6×** across bands. 10-15 experiences ~6× the
++fractional churn of 80-100 under the fixed-absolute rule. **The robustness trend cannot be read without this:**
++the larger band is more robust partly because it experiences far less proportional churn (on top of 3.1).
++
++### 3.7 RQ1(a): per-episode loss ~ predictor (pooled, N=4410)
++loss ~ n_discovered CUMULATIVE **R²=0.108**; ~ n_discovered CURRENT R²=0.099; ~ nominal band size **R²=0.017**;
++~ both R²=0.351. **n_discovered predicts loss ~6× better than nominal band size** (0.108 vs 0.017), directionally
++supporting "tracks the discovered graph, not nominal size" — but both R² are LOW (per-episode loss is mostly
++episode noise); cumulative ≈ current.
++
++### 3.8 RQ3(c): behavioural residual ~ structure (churn) vs type (property fraction, continuous)
++churn R²=**0.000**; property fraction R²=**0.007**; both R²=0.008. **NULL — neither structure nor type predicts
++the per-episode behavioural residual.** UNDERPOWERED: the per-episode residual (loss − gross mechanical) is
++dominated by noise; this design cannot detect anything but a very large episode-level effect, so the null is
++reported WITH its power, not as evidence of no effect.
++
++### 3.9 RQ3(d): loss concentration + signature
++Top 10% of positive-loss episodes = **18% / 32% / 34%** of total loss — moderately concentrated, NOT extreme.
++Signature: the biggest-loss episodes have **LOWER churn (0.36 vs 0.50) and FEWER root departures (0.70 vs 1.23)**
++than the rest → the concentration is driven by BEHAVIOURAL failure, not heavy-churn/removal episodes (consistent
++with 3.5).
++
++## PART 3 corrections (2026-08-02, post-review) [FINDING]
++### Item 1 — CHURN CONFOUND: bands are NOT comparable at matched churn (the finding)
++Per-episode churn (leave/N) distributions per band (min/median/max): 10-15 **0.23/1.09/3.00**, 30-40
++**0.11/0.47/1.05**, 80-100 **0.04/0.19/0.40**. The three-band common overlap is **EMPTY** (10-15's 5th pctile
++0.58 > 80-100's 95th pctile 0.28); 10-15 and 80-100 share NO churn level. So under the CX fixed-ABSOLUTE
++removal rate the bands inhabit disjoint churn regimes and a matched-churn robustness comparison is **impossible
++from CX data** — stated as the finding, not worked around. The robustness trend (3.2) therefore **cannot be
++disentangled from churn within CX**. (F3 churn-matched at ~32% once, 0.775 vs 0.665, but under fixed-RELATIVE,
++different agents, raw data gone — CX cannot reproduce that matching.)
++
++### Item 2 — RQ3(c) retried with STRUCTURAL predictors (the ones the sub-question names), WELL-POWERED
++Per-episode behavioural residual (N=4266; residual sd 4.33; detectable R² ~0.0018 → well-powered): behav ~ mean
++changed-node degree **R²=0.007**, ~ 2-hop neighbourhood size **R²=0.004**, ~ summed drift (propagation proxy)
++**R²=0.000**, ~ all three **R²=0.011**. So structure is **statistically detectable but practically negligible**
++— ~1% of the episode-level behavioural residual, NOT a null-from-underpower this time. Episode-level structure
++barely predicts the behavioural residual (the per-event question remains blocked by gate N2). Correcting the
++earlier churn/property-fraction test, which used the wrong predictors.
++
++### Item 3 — two elevated findings
++- **The mechanical share REVERSES with scale: 77% / 36% / 28%.** The smallest band's cost is mostly arithmetic
++  (roots directly taken away); the largest band's is mostly behavioural (the agent fails to re-own). This runs
++  **OPPOSITE to the F-series' 69–76% mechanical** decomposition — but under a DIFFERENT disturbance model
++  (uncapped/undiscovered CX vs capped/discovered F-series) and DIFFERENT agents, so the two are not directly
++  comparable; the reversal is a property of the CX condition.
++- **Loss concentrates in the LEAST-disturbed episodes.** Top-decile-loss episodes carry churn 0.36 (vs 0.50) and
++  0.70 root departures (vs 1.23) — the biggest losses are BEHAVIOURAL failure, not heavy disturbance.
++
++## PART 4 — can existing data partially answer RQ1(c)? (2026-08-02) [FINDING] — NO, underpowered
++### 4.1 degree fixed = scenario KNOWS OUT-DEGREE (evidence_taskY.md 0.1, the RQ3 predictor); used by name throughout.
++### 4.2 within-band spread across the 8 topologies CX used (material): 10-15 6.2–9.0 (mean 7.6, sd 1.0), 30-40
++16.4–26.2 (21.9, 3.0), 80-100 42.5–63.1 (54.7, 6.2). Spread ~40% of mean → test worth attempting. BUT the
++per-band ranges are DISJOINT (9.0<16.4<42.5), so degree cannot be matched across bands (collinear with size).
++### 4.3 within-band per-topology robustness (CX root / static root) vs degree, N=8/band:
++corr = **+0.12 (10-15), +0.63 (30-40), +0.06 (80-100)**; slopes +0.005/+0.007/+0.0003 robustness per +1 degree.
++Only 30-40 hints positive (higher degree → more robust), inconsistent with the other two.
++### 4.4 POWER: N=8 topologies/band → detectable |corr| at 80% power, α.05 is **~0.83** (only a very large effect).
++Even the 30-40 +0.63 is BELOW that threshold → not significant. The test can detect essentially nothing.
++### 4.5 VERDICT: **RQ1(c) is NOT answerable from existing data.** The within-band degree test is underpowered
++(N=8, |corr|>0.83 detectable) with inconsistent point estimates (+0.12/+0.63/+0.06), and across bands degree and
++size are collinear (disjoint ranges). This is a weak, confounded substitute for the designed Task Y contrast
++(degree varies with everything else across topologies). **RQ1(c) stands as designed-and-NOT-run** (Task Y gate,
++STOPPED at STEP 0 — infeasible at n=30, feasible at target-20; evidence_taskY.md), with this analysis reported
++as a suggestive hint at most (a non-significant positive degree→robustness at 30-40 only), NOT an answer.
++
++## ITEM A — churn stratification: does the cost trend survive matching on disturbance? (2026-08-02) [FINDING, MIXED BY PAIR]
++
++Analysis-only, re-does the PART 3 churn comparison with the rigor of the ITEM-A spec. Supersedes the PART 3
++"bands don't overlap, not comparable" summary — that held on the **bulk**, but limited tail overlap permits a
++caveated matched comparison, which is run here.
++
++### A.1 — the churn quantity, defined; two deviations reported first
++**Definition used:** per-episode fractional churn = (nodes removed by membership_leave) / initial_alive, where
++initial_alive is the network size captured at reset **before any within-episode change**
++(`cyberbattle_env_compressed.py:259` `self._cx_ep_initial_alive = len(self.environment.nodes)`).
++
++**DEVIATION 1 — numerator must be NODES, not events.** The logged per-episode field
++`event_counts["membership_leave"]` counts leave *events* (`:761` `self._cx_ep_event_counts[ct] = ...+1`, one per
++`dynamic_event`), but a leave event can carry multiple `node_ids` (`:763` sums over `e["node_ids"]`). Measured
++over the CX corpus: leave events by #nodes removed = {1: 60200, 2: 4129, 3: 1405, 4: 458, 5: 136, 6: 27, 7: 6},
++i.e. **9.3% of leave events remove 2–7 nodes**. So the event count understates node churn. The correct numerator
++(nodes) is reconstructed from `event_graph.jsonl` `events[].node_ids` (excluding `event_phase=='attributed'`).
++Batch inflation (nodes/events) is **~uniform across bands** (1.09 / 1.14 / 1.14), so it does not distort the
++cross-band comparison; all A numbers below use the NODE numerator.
++
++**DEVIATION 2 — denominator moment.** initial_alive (episode-start) is used, not final_alive; the network barely
++moves within an episode so the choice is immaterial (<2% shift), but it is stated rather than left implicit.
++Churn can exceed 1.0 (nodes join then leave), so it is a removal *rate* relative to start size, not a fraction ≤1.
++
++### A.2 — node-churn distributions (min, Q1, median, Q3, max; n)
++| band | min | Q1 | median | Q3 | max | n episodes |
++|---|---|---|---|---|---|---|
++| 10-15 | 0.30 | 0.92 | 1.10 | 1.30 | 2.10 | 640 |
++| 30-40 | 0.14 | 0.45 | 0.53 | 0.61 | 0.88 | 1770 |
++| 80-100 | 0.07 | 0.18 | 0.21 | 0.25 | 0.44 | 2000 |
++
++### A.3 — overlap: BULK disjoint, TAILS overlap
++**IQRs are fully disjoint** — 10-15 [0.92,1.30], 30-40 [0.45,0.61], 80-100 [0.18,0.25] (this is the PART-3
++"no overlap" finding, and it holds for the central mass). Overlap exists **only where each band's tail crosses
++the adjacent band**: 10-15∩30-40 in ~[0.30,0.88], 30-40∩80-100 in ~[0.14,0.44]. The extremes (10-15∩80-100)
++barely touch ([0.30,0.44], negligible n). So the two SMALLER-vs-LARGER adjacent comparisons are possible **only
++in tail strata**; the extreme 10-15↔80-100 contrast is NOT matchable and is not attempted (no extrapolation).
++
++### A.4/A.5 — stratified robustness (counts BEFORE rates); robustness = mean root-owned(change arm, stratum) / band static mean
++Fixed common churn bins. Static arm has no churn → one baseline per band (band static mean, no stratification).
++
++| churn bin | 10-15 | 30-40 | 80-100 |
++|---|---|---|---|
++| [0.07,0.14) | – | n=1 | 0.947 (n=146) |
++| [0.14,0.20) | – | n=4 | 0.953 (n=634) |
++| [0.20,0.30) | – | 0.890 (n=40) | 0.934 (n=1099) |
++| [0.30,0.45) | n=5 | 0.861 (n=392) | 0.933 (n=121) |
++| [0.45,0.62) | n=16 | 0.826 (n=941) | – |
++| [0.62,0.92) | 0.775 (n=140) | 0.774 (n=392) | – |
++| [0.92,1.30) | 0.735 (n=285) | – | – |
++| [1.30,2.20) | 0.686 (n=194) | – | – |
++(unmatched full robustness: 0.733 / 0.824 / 0.941)
++
++**A.5 first — within a band, robustness falls monotonically with churn:** 10-15 0.775→0.735→0.686;
++30-40 0.890→0.861→0.826→0.774; 80-100 0.947→0.953→0.934→0.933. More disturbance → less root retained, in
++every band. Note the SLOPES differ: **80-100 is nearly churn-insensitive** (0.933–0.953 across its whole range),
++**10-15 is steeply churn-sensitive** (0.686–0.775). The larger band is not only more robust on average but its
++robustness degrades far less with disturbance.
++
++**A.5 second — within a churn stratum, across bands. EPISODE-level p is pseudoreplicated (episodes share seed +
++topology; each stratum is 5 seeds/band), so the SEED is the unit. Both levels reported; the verdict rests on SEED:**
++| stratum | smaller band | larger band | matched gap | % of unmatched gap | episode-level p | **seed-level (n=5v5)** |
++|---|---|---|---|---|---|---|
++| [0.20,0.30) | 30-40 = 0.890 (n=40) | 80-100 = 0.934 (n=1099) | +0.045 | 38% | 0.247 (NS) | Welch **0.293**, MWU 0.548 (NS) |
++| [0.30,0.45) | 30-40 = 0.861 (n=392) | 80-100 = 0.933 (n=121) | +0.072 | 62% | <0.001 (sig) | Welch **0.124**, MWU 0.310 (NS) |
++| [0.62,0.92) | 10-15 = 0.775 (n=140) | 30-40 = 0.774 (n=392) | −0.000 | ~0% | 0.987 (NS) | Welch **0.911**, MWU 1.000 (NS) |
++
++Seed-means (the unit): [0.30,0.45) 30-40 = {0.936,0.872,0.804,0.947,0.754}, 80-100 = {0.903,0.927,0.936,0.991,0.922}.
++**The one episode-level-significant residual (30-40↔80-100, [0.30,0.45), p<0.001) does NOT survive seed-level
++clustering (p=0.124, MWU 0.31).** No across-band matched-churn gap is significant at the seed level.
++
++**Selection direction:** in every overlap stratum the SMALLER band contributes its LOW-churn tail (its easiest
++episodes) and the LARGER band its bulk/high-churn side — the comparison is biased in the SMALLER band's favour.
++
++### A.6 — VERDICT (settled at the seed level): the cost trend is consistent with CHURN VOLUME; no scale residual is established
++At the correct unit of analysis (seed, n=5 vs 5), **none of the three matched-churn across-band gaps reach
++significance** — including the 30-40↔80-100 gap that looked significant at the (pseudoreplicated) episode level.
++So, matched on disturbance, **the entire count-robustness cost trend (0.733 / 0.824 / 0.941) is consistent with
++churn volume; the data do not support a band-size residual once churn is held.** This is the bigger finding and
++is reported first, per the ITEM-A rule. The 10-15↔30-40 gap closes exactly at both levels (0.775 vs 0.774,
++p=0.99) — clean.
++
++**UNDERPOWERED ≠ EFFECT ABSENT (carried):** 5-vs-5 seed tests are severely underpowered, and the gap DIRECTION
++consistently favours the larger band (+0.069 / +0.074; 4–5 of 5 80-100 seed-means exceed the 30-40 mean). So the
++honest statement is **"a scale residual is NOT ESTABLISHED,"** not "scale has no effect beyond churn." The
++seed-level test cannot separate all-churn from churn-plus-small-residual; the direction is a hint, the
++significance is not there.
++
++### A-INDEP — churn-SENSITIVITY of robustness differs sharply by band (independent of the stratification/cross-band verdict)
++This result stands whether or not the matched cross-band comparison survives — it is a within-band slope, not a
++cross-band contrast. Robustness falls with churn in EVERY band, but the slope is steeply band-dependent:
++- **80-100: nearly churn-insensitive** — 0.947 → 0.953 → 0.934 → 0.933 across churn [0.07 … 0.45] (range ~0.02).
++- **30-40: moderate** — 0.890 → 0.861 → 0.826 → 0.774 across [0.20 … 0.92] (range ~0.12).
++- **10-15: steep** — 0.775 → 0.735 → 0.686 across [0.62 … 2.20] (range ~0.09 over a narrower churn window; the
++  per-unit-churn slope is the steepest of the three).
++The larger band not only retains more root on average but its retention **degrades far less per unit of
++disturbance**. This is a scale-of-robustness-STABILITY finding that is independent of the A.6 cross-band verdict.
++
++### A.7 — PART 3.1 limitation carried
++Still a **converged smaller band vs an undertrained larger band**. Because the matched-churn cross-band residual
++is not established at the seed level (A.6), the training-state confound now bears on a null: a *converged* 80-100
++could reveal a scale residual that the current undertrained agent masks, or the churn-only reading could hold.
++The near-flat churn-insensitivity of 80-100 (A-INDEP) is likewise measured on an undertrained agent. Neither the
++churn-only verdict nor the stability slope is separable from training-state with this data.
++
++## ITEM B — RQ3(c) retried with structural predictors + paired baseline (2026-08-02) [FINDING — REVERSES the earlier null; structure ≫ type, well-powered]
++
++Supersedes PART 3.8 (R²=0.000/0.007) and the PART-3 correction Item 2 (structure R²=0.011). The earlier low
++numbers came from (a) a **mis-scaled propagation proxy** — summed `change_drift_full`, a *relative* drift ~0.008,
++R²≈0.0002 — and (b) a residual built on the band mean. Both are fixed here.
++
++### B.1 — structural predictors, per episode (from the event logs)
++- **mean changed-node degree** (two definitions, B.2 below).
++- **mean 2-hop neighbourhood size**: for each changed node, nodes within 2 hops in that step's logged `pre_edges`
++  (undirected), averaged over the episode's change events.
++- **summed propagation**: per event = full graph-embedding drift minus the node's own contribution, in
++  **consistent absolute units**. `change_drift_full` (relative) and `delta_h_v_norm` (absolute norm) are different
++  scales (means 0.008 vs 0.095, corr 0.61) so the literal subtraction is invalid; instead ‖Δh_G‖ is recovered from
++  `attenuation_ratio_full = ‖Δh_v‖/‖Δh_G‖`, giving **propagation = ‖Δh_G‖ − ‖Δh_v‖ = delta_h_v_norm·(1/att − 1)**,
++  summed per episode. NOTE it is predominantly NEGATIVE (band means −2.5 / −3.5 / −4.6): the pooled graph-embedding
++  change is on average SMALLER than the changed node's own change → **net attenuation, growing with band** (more
++  nodes to average over) — the pooling-attenuation signature, so this predictor is signed "aggregate-minus-own,"
++  negative = attenuation.
++- **type composition**: property fraction = property events / all change events per episode (the type side).
++
++### B.2 — WHICH DEGREE, both named
++- **Runtime visible-graph degree at fire** (logged `changed_node_degree`, `event_graph.jsonl`): R²=**0.0016** pooled
++  vs resid_pair (up to 0.127 within 30-40) — weak.
++- **Scenario knows out-degree** (out_degree of the changed node in `network_SecureBERT.pkl` `knows_graph`, the
++  RQ3-named quantity, evidence_taskY.md 0.1): R²=**0.0000** pooled, 0.004–0.006 within band. **Undefined for 56.4%
++  of changed nodes** (84,028 mapped / 108,621 unmapped) — the majority are synthetic `JoinNode_*` created at
++  runtime, absent from the scenario knows_graph, so scenario knows out-degree cannot even be computed for most
++  change events.
++- **The conclusion rests on NEITHER degree.** Both are the weakest structural predictor under either definition;
++  the structural signal is carried by 2-hop and propagation (below), so the degree-quantity choice is immaterial
++  to the verdict. Neither is described as bare "degree."
++
++### B.3 — outcome variable improved (paired baseline), variance checked
++Residual = **(baseline root-owned − actual root-owned) − mechanical root loss**, where mechanical root loss =
++logged `root_owned_departures` (owned-root nodes forcibly removed by churn). All 117 CX (band,seed,topology) cells
++have a static pair (median 48 static episodes/cell, min 6), so every one of 4,410 CX episodes is pairable.
++- band-mean baseline: residual sd **5.47** (var 29.9)
++- **paired (per seed×topology) baseline: residual sd 4.85 (var 23.5) → 21.5% variance reduction.**
++Material but not dominant (78% of variance is within-cell episode stochasticity), so the earlier null was NOT
++purely a baseline artefact. Regression redone on the paired residual; the structure≫type conclusion holds on BOTH
++baselines (structure R² 0.182 band / 0.155 paired), so it is not baseline-driven.
++
++### B.4 — structure vs type, same episodes (on resid_pair, N=4410)
++| predictor set | R² pooled | 10-15 | 30-40 | 80-100 |
++|---|---|---|---|---|
++| **STRUCTURE** (deg+2hop+propagation) | **0.155** | 0.148 | 0.365 | 0.331 |
++|   – 2-hop alone | 0.076 | 0.054 | 0.342 | 0.094 |
++|   – propagation alone | 0.079 | 0.097 | 0.104 | 0.091 |
++|   – degree alone (runtime) | 0.002 | 0.024 | 0.127 | 0.027 |
++| **TYPE** (property fraction) | **0.011** | 0.003 | 0.033 | 0.004 |
++| structure + type | 0.158 | — | — | — |
++
++**Structure explains ~14× more of the behavioural residual than type**, and this is NOT a between-band size
++confound: within every band structure R² (0.148 / 0.365 / 0.331) far exceeds type (0.003 / 0.033 / 0.004) — the
++gap is if anything LARGER within band. (The pooled 0.155 is a conservative floor; within-band it's 0.15–0.37.)
++
++### B.5 — power reported with the result
++Detectable R² @80% power, α.05: **~0.0025 (k=3), ~0.0018 (k=1)**. Both structure (0.155) and type (0.011) sit far
++above the floor → **well-powered; this is NOT the underpowered null of PART 3.8.** The near-zero degree R² (0.002)
++is a genuine "degree barely matters," not underpower. Pseudoreplication caveat (4410 episodes in 117 cells): R² is
++descriptive variance-explained, and the within-band consistency across 5 seeds × many topologies (0.15/0.37/0.33)
++shows the effect is pervasive, not one-cell-driven — the analogue of ITEM A's seed-clustering robustness.
++
++### B.6 — verdict: RQ3(c) ANSWERED (not null)
++**Grouping the non-arithmetic loss by STRUCTURE (2-hop neighbourhood, aggregate-vs-own drift/attenuation) explains
++substantially more than grouping by KIND OF CHANGE — ~15% vs ~1% of the episode-level behavioural residual, well
++above the detectable floor, holding within every band.** The per-event cost attribution ruled out at gate N2 is
++NOT needed: episode granularity already resolves structure ≫ type. This reverses the earlier null, which was an
++artefact of a relative-scale propagation proxy and a band-mean baseline, not a real absence of structural signal.
++LIMITATION carried: still converged-smaller vs undertrained-larger (PART 3.1); the within-band strength at 30-40
++(converged) is the cleanest cell.
++
++## RQ1(a) — three checks on found-count vs nominal size (2026-08-02) [FINDING — the coefficient is NEGATIVE; original claim does NOT survive]
++
++Revises 3.7 (loss ~ found-count R²=0.108 vs nominal size R²=0.017, "tracks discovered graph not nominal size").
++Loss definition locked by reproducing 3.7 exactly: **loss = band-static-mean(final_root_owned) − episode
++final_root_owned_count** (score = `final_root_owned_count`; +loss = worse episode). Found-count = `cumulative_discovered`.
++
++### CHECK 1 — THE SIGN (reported first): NEGATIVE
++loss ~ cumulative found-count (original, episode-level, N=4410): **slope = −0.0576, 95% CI [−0.0625, −0.0527]** —
++**NEGATIVE.** More machines found → LOWER loss, the **opposite** of the "more found → more exposure → more to lose"
++hypothesis. This is exactly the confound channel: a bad episode both finds fewer machines AND loses more, forcing a
++negative slope. Per the pre-committed rule, a negative coefficient means the measured relationship runs opposite to
++the hypothesis and cannot be separated from episode quality — not reframed.
++
++### CHECK 2 — field used, and made exogenous
++Field = `cumulative_discovered` (cumulative-ever), quoted from `event_episode.jsonl`; it is contaminated (partly an
++OUTCOME of how the episode went), as is `n_discovered_end`. Exogenous alternative (a) available: all 117 cells
++pairable by seed+topology (ITEM B.3), and the STATIC arm has no change, so its found-count measures agent+topology
++discovery independent of the change arm's outcome.
++- Episode-level, exogenous static found-count: **slope −0.0251 [−0.0304,−0.0198], R²=0.019** — still NEGATIVE, and
++  R² collapses from 0.108 → 0.019, i.e. **most of the apparent found-count signal was contamination.**
++- Cell-level (n=117), exogenous static found-count vs paired disturbance-loss: slope −0.0112 [−0.0203,−0.0021],
++  R²=0.049, p=0.016 — NEGATIVE. (Change-arm/contaminated version: −0.0134, R²=0.066, p=0.005 — also NEGATIVE.)
++
++### CHECK 3 — NESTED test, inference unit = 117 cells (not 4410 episodes)
++| model (cell-level, paired loss) | R² | increment | F, p |
++|---|---|---|---|
++| band identity alone | **0.4351** | — | — |
++| + static (exogenous) found-count | 0.4401 | ΔR²=+0.0050 | F(1,113)=1.01, **p=0.318 → adds NOTHING** |
++| + change-arm (contaminated) found-count | 0.4910 | ΔR²=+0.0559 | F(1,113)=12.41, p=0.0006 → adds, but this IS the contamination |
++
++Within-band correlations (exogenous static found-count vs paired cell loss): 10-15 r=−0.148 (p=0.38), 30-40
++r=−0.019 (p=0.91), 80-100 r=−0.125 (p=0.44) — all NEGATIVE, all non-significant. The pooled result is **between-band
++only.** Note the reframing of 3.7's "nominal only 0.017": at the episode level nominal size looks weak only because
++per-episode loss is ~98% noise; at the **cell level band identity explains 43.5%** of systematic loss — nominal size
++is NOT weak, it captures nearly all the systematic between-band loss, and exogenous discovery adds nothing to it.
++
++### VERDICT (pre-committed NEGATIVE branch)
++**RQ1(a) is NOT answered in the hypothesized direction.** The found-count↔loss coefficient is NEGATIVE (opposite to
++"more found → more to lose") and cannot be separated from episode quality: (1) sign negative; (2) exogenously the
++R² collapses 0.108→0.019 and stays negative; (3) nested at the cell level, exogenous found-count adds nothing over
++band identity (ΔR²=0.005, p=0.32), the only significant increment coming from the contaminated change-arm predictor.
++The original "found-count predicts 6× better than nominal size" was an artefact of (a) pooling episode noise (which
++deflated nominal size's apparent R²) and (b) outcome contamination in the change-arm discovery count. Reported as
++running opposite to the hypothesis, not reframed.
++
++## REPLAY RESULTS (2026-08-02) [both deliverables — PID 1365689 completed, 5 seeds/band, cx_step2_replay/]
++
++### R1 — departing-node-held-an-extreme flag settles PART-1's sign ASSUMPTION-FREE [CONFIRMED]
++Forced-action replay logged, per single-node membership_leave event, whether the departing node held ≥1 coordinate
++extreme (`departing_held_max/min`) alongside the observed pooled slice movement (`change_drift_max/min>0`).
++Matched events (n = 2043 / 6179 / 9730 single-node leaves):
++| band | slice | departing-held rate | observed slice-MOVED rate | P(moved \| held) | P(moved \| NOT held) |
++|---|---|---|---|---|---|
++| 10-15 | max | 0.885 | 0.922 | **1.000** | 0.319 |
++| 10-15 | min | 0.878 | 0.915 | **0.999** | 0.309 |
++| 30-40 | max | 0.611 | 0.721 | **0.998** | 0.285 |
++| 30-40 | min | 0.571 | 0.672 | **0.997** | 0.239 |
++| 80-100 | max | 0.345 | 0.398 | **0.999** | 0.081 |
++| 80-100 | min | 0.225 | 0.276 | **0.995** | 0.067 |
++**When the departing node held an extreme, the slice moved with probability ≈1.0 in every band/slice** — the
++mechanism PART 1 assumed is confirmed directly, no uniform-null assumption needed. The two opposing selection
++biases PART 1 flagged do not overturn it: held→moved is near-deterministic. The departing-held rate (0.89/0.61/0.34
++max) is the empirically-measured effective-p driver and it FALLS with scale (fewer nodes-per-extreme at large n).
++The small moved-minus-held gap is the P(moved|not-held) residual (0.08–0.32): slice moves via retained-node
++re-ranking / message-passing even when the departing node wasn't that slice's extreme holder. **PART-1 sign: POSITIVE, settled.**
++
++### R2 — property-zero cause: NOT zero vulnerabilities; it is a FEATURE-LEVEL NO-OP [zero-vuln hypothesis FALSIFIED]
++Zero-drift property events reproduced exactly: **14 / 330 / 130** (10-15/30-40/80-100). Tested in the pre-committed order:
++1. **"already at zero vulnerabilities" — FALSE.** `pre_n_vulns==0` accounts for **0/14, 0/330, 0/130**. Every
++   zero-drift property node HAD vulnerabilities (modal state vulns=1,services=1,running=1: 10/14, 245/330, 119/130;
++   range vulns 1–5). Zero of them were empty nodes.
++2. **"node not visible in the pool" — FALSE.** `touched_node_visible==True` for **100%** of both zero-drift and
++   nonzero-drift property events. The node is in the pooled embedding.
++3. **CAUSE: feature-level no-op.** `delta_h_v_norm==0` for **14/14, 330/330, 130/130** — the changed node's OWN
++   embedding did not move at all. So the property change altered a node property that is **not part of the GNN
++   node-feature encoding**; it fired on a real, visible, vulnerable node but produced no feature change, hence no
++   node-embedding change, hence exactly zero pooled drift. The zeros are inert *by encoding*, not by empty nodes.
++
++## ATTENUATION vs behavioural residual (2026-08-02, exploratory RQ probe) [protective, one-directional; the two-sided hook FALSIFIED]
++Test of "is pooling attenuation protective or blinding?" att_strength (per event, mean) = ‖Δh_v‖−‖Δh_G‖ (>0 =
++pool swallowed the change); outcome = paired behavioural residual (ITEM B).
++- **SIGN: uniformly NEGATIVE (PROTECTIVE) in every band** — r = −0.295 / −0.418 / −0.400 (all p≪1e-14). More
++  attenuation → LOWER behavioural loss. **No blinding regime**: property-heavy vs churn-heavy split stays negative
++  in both (10-15 −0.33/−0.26, 30-40 −0.56/−0.19, 80-100 −0.48/−0.30) — never flips positive. The two-sided
++  protective-AND-blinding tension I hypothesised is **FALSE**; attenuation only protects (more so under churn).
++- **NOT a quiet-episode artifact**: partial r controlling for #events, #leaves, realized graph-movement ‖Δh_G‖
++  = −0.338 / −0.455 / −0.419 (survives, strengthens).
++- **CAVEAT (endogeneity, unresolved)**: att is measured on the same trajectory the agent shaped, so
++  "good episode → stable owned subgraph → high attenuation AND low loss" is not ruled out. Association, not
++  established mechanism. Would need exogenous (static-arm) attenuation as predictor to argue causality.
++- **Overlaps ITEM B** (propagation ≈ −att_strength already predicted the residual). VERDICT: solid one-directional
++  association, but NOT distinction-grade as-is (one-sided + endogenous + overlaps B).
++
++## PERCEPTION-GAP probe (2026-08-02, exploratory RQ) [SEPARABILITY PASSES + survives the endogeneity killer]
++Unifies #1 (content gap: change the observation can't encode) + #2 (timing gap: change seen late). Per episode:
++inv_frac = fraction of fired change events with |change_drift_full|<eps (didn't reach the pool); defer_frac =
++fraction with touched_node_visible==False at fire (not yet seen). Outcome = paired behavioural residual (ITEM B).
++CELL-LEVEL nested (117 cells, the inference unit):
++| model | base R² | +perception-gap R² | ΔR² | F, p |
++|---|---|---|---|---|
++| over band + churn + n_events (separability) | 0.400 | 0.525 | **+0.125** | F(2,110)=14.5, p<1e-4 |
++| + EXOGENOUS static-arm discovery control | 0.405 | 0.527 | +0.122 | F(2,109)=14.1, p<1e-4 |
++| + ENDOGENOUS change-arm discovery (episode-quality proxy) | 0.488 | 0.566 | **+0.078** | F(2,109)=9.8, p=1e-4 |
++Component increments over band+churn+nev: invisible/content ΔR²=+0.113 (p<1e-4), deferred/timing ΔR²=+0.070
++(p=2e-4), lag/timing +0.058 (p=8e-4, but mean_lag within-band sign is inconsistent −0.20/−0.11/−0.05 — dropped;
++defer_frac is the clean timing measure, positive in all bands +0.29/+0.24/+0.19).
++**KEY:** the gap survives controlling for episode quality (change-arm discovery lifts base 0.40→0.49, yet the gap
++still adds +0.078, p=1e-4). ~40% of the raw effect was episode-quality co-variation; ~60% is independent. So —
++UNLIKE the attenuation probe — this is NOT merely an artifact of bad episodes. Within-band episode-level: content
++r=+0.22/+0.40/+0.27, deferred r=+0.29/+0.24/+0.19 (all p≪1e-6). VERDICT: separable from size, disturbance amount,
++exogenous discoverability, AND episode quality → the strongest RQ candidate; distinction-viable. Residual caveats:
++discovery is an imperfect quality control; content gap mixes encoding-no-ops (exogenous) with unpooled-node changes;
++cross-band training confound still taints the SCALING reading (#3 untested here); depends partly on #4 (does the
++policy use the pooled channel) for the content arm.
++
++### Follow-ups (a) scaling and (b) content decomposition — both DEFLATE the rich framing (2026-08-02)
++**(b) The "content gap" is ~99.6% undiscovered-node blindness, NOT encoder lossiness.** Composition of zero-drift
++fired events: membership_join/leave on invisible (undiscovered) nodes dominate (12384+9450 / 52818+40815 /
++64082+43462), property encoding-no-ops are 14/330/130 = **0.06%/0.35%/0.12%**. So "content" and "timing" are the
++SAME phenomenon — change on nodes the agent hasn't discovered — not two mechanisms. Nested (cell-level, over
++band+churn+nev): endo/undiscovered ΔR²=+0.077 (p=1e-4, credible); deferred/timing ΔR²=+0.070. The exo/encoding-no-op
++fraction shows ΔR²=+0.199 (p<1e-4) DESPITE being 0.1% of events — **implausible as a mechanism (0.3% no-op rate
++cannot cause 2.7 root loss); treated as a SPURIOUS proxy** (likely property-intensity/topology lurking variable),
++NOT leaned on.
++**(a) The perception gap does NOT explain the non-monotone cost.** Band-mean gaps are nearly FLAT (endo 0.68/0.72/0.70,
++defer 0.68/0.74/0.73) while cost swings 8× (behav resid 0.34/2.73/1.38). Adding the gap does NOT flatten the band
++effect: 30-40 dummy +2.03→+1.83 (persists), 80-100 +0.79→+1.08. **BUT #3 is REAL and strengthened:** relative
++residual (resid/baseline) = **0.043 / 0.118 / 0.046** — 30-40 is worst even normalized by stake, so "medium
++networks hardest" is NOT a little-at-stake artifact. Its cause is NOT the perception gap (separate open finding;
++likely the converged-30-40-vs-undertrained-80-100 training confound or a genuine exploration difficulty peak).
++**NET:** the RQ simplifies to ONE clean finding — undiscovered-frontier blindness drives within-band loss, separable
++from size/churn/episode-quality (+0.078) — but the content-vs-timing split collapses (one mechanism), the
++encoder-lossiness angle is negligible, and the gap does not explain the non-monotonicity. #3 stands as a separate,
++real, unexplained anomaly.
++
++## #3 RESOLVED — the "medium networks hardest" peak is a CONQUEST × SCALE artifact, not a real peak (2026-08-02)
++Capability (STATIC arm, owned_ratio = fraction of ownable nodes captured, no disturbance): 10-15 **0.77**, 30-40
++**0.80**, 80-100 **0.47**. 80-100 only captures HALF the network (undertrained/under-capacity); 10-15 and 30-40
++both near-fully conquer. Relative fragility (behavioural residual / static baseline root-owned) per band: 0.029 /
++**0.111** / 0.043.
++**Conquest is EXOGENOUS here (measured on the static/no-disturbance arm), so this is a clean predictor of the change
++arm's fragility.** Cell-level (n=117):
++- `rel ~ log(size) + conquest`: R²=0.376, **coef conquest = +0.309, coef log(size) = +0.054 (both POSITIVE)**.
++  Fragility rises with BOTH how much the agent conquered AND network size.
++- `rel ~ conquest + band dummies`: conquest +0.242; **30-40 dummy +0.072 ≈ 80-100 dummy +0.086** — after controlling
++  conquest the apparent 30-40 peak VANISHES (80-100 is if anything marginally more fragile). The peak was 80-100's
++  conquest deficit suppressing its fragility.
++- High-conquest(>0.55) 80-100 cells (n=2, underpowered): rel 0.060 > the 0.043 band mean, trending toward 30-40's
++  0.111 — directionally consistent with "if 80-100 were fully conquered it would be the MOST fragile."
++**RESOLUTION:** #3 is NOT a genuine "medium hardest" peak — it is an artifact of the largest band being under-conquered.
++The true (conquest-conditional) law is MONOTONE: **fragility increases with conquest and with scale.** The quotable,
++defensible finding is *"the more thoroughly (and the larger the network) the RL attacker has captured, the greater
++the FRACTION of its foothold it loses when the network changes — success is itself a liability; the biggest network
++looks safest only because the agent never finished conquering it."* LIMITATION: the size-at-fixed-conquest slope
++(+0.054) leans on the 10-15→30-40 contrast; nailing it needs a CONVERGED 80-100 (high conquest at large scale),
++which requires training beyond the 15 Aug stop. The conquest→fragility effect (+0.309) is well-supported and exogenous.
+\ No newline at end of file
+diff --git a/evidence_cards/evidence_taskF4.md b/evidence_cards/evidence_taskF4.md
+index 631daec..45cf535 100644
+--- a/evidence_cards/evidence_taskF4.md
++++ b/evidence_cards/evidence_taskF4.md
+@@ -152,3 +152,30 @@ feasible" 80-100 checkpoint is 750k. F4 STEP 2/3/4 (re-run F2/F3 cells + the 250
+ comparison) and D3 STEP 2.2 (80-100 substitution) would use the **750k** 80-100 checkpoints, disclosed
+ as not-fully-converged (still +5.4%/rising), against the CONVERGED 30-40 (500k) and 10-15 (500k). 30-40
+ and 10-15 need no further training. Reported to the user for direction before running STEP 2+.
++
++## TASK A (30-40 multi-topology set) A.0 gate — STOP before training (2026-08-02, autonomous) [FINDING]
++Pre-authorised to train under conditions; A.0.1/0.2/0.2b clear, but **A.0.3 fails and I will not improvise**.
++
++- **A.0.1 pool:** `scalability_30_40`, training split = **60 topologies** (ids 2,3,5,6,8,…,98); **topo44 ∈
++  training (34 nodes)**. Node counts of the pick: topo44=34, topo2=36, topo3=32, topo5=40, topo6=34. Pool ≫ 5
++  → the "pool too small" STOP does NOT fire.
++- **A.0.2 seeds:** {42,100,123,200,300}, fixed.
++- **A.0.2b rule (stated blind to any outcome): lowest remaining training-split ids, excluding 44.** →
++  seed42→topo44 (the matched-pair control vs old-seed42-topo44), 100→topo2, 123→topo3, 200→topo5, 300→topo6.
++  All five distinct. (Only structural ids/node-counts consulted; no training outcome looked at.)
++- **A.0.3 — CANNOT CONFIRM THE 10-15 PROTOCOL FROM SOURCE → STOP.** The F4 10-15 fresh-500k five-topology
++  static set (card 0.4's plan: seeds→scalability_10_15/{61,54,62,29,4}, 500k, dynamic_mode=none) **was never
++  trained** — no `dynamic_mode=none` + 500k config exists anywhere in `logs/`. The only 10-15 static-single
++  agent is `compressed_10-15_static_single_trpo_matched` (**1M** timesteps, `local_baseline_single_topology`
++  — a single fixed topology, NOT the five mapped scalability topos at 500k). So there is no existing 10-15
++  fresh-500k protocol to match "exactly," and the third comparison point (10-15 five-topology) does not exist.
++- **Consequences:** (1) Task A's like-for-like premise is unfulfillable until the 10-15 fresh set is defined
++  and trained; (2) **Task B B.0.1's expected "10-15 500k fresh five topologies CONVERGED" checkpoint does not
++  exist** — an additional B.0 stop condition beyond the lost F2/F3 harness.
++- **A.0.4 cost (if the user still wants 30-40 built):** F4 recorded fresh-500k 30-40 ≈ **2.8 h** for the set.
++- **A.0.5 pool/survivorship:** these five topologies are from `scalability_30_40`, the same accepted pool as
++  every scenario in this work, and inherit the same generation-time connectivity-rejection filter (Task SV).
++
++**DECISION IS THE USER'S** (not covered by the pre-authorisation): whether to (a) first train the 10-15
++fresh five-topology set so a protocol exists to match, (b) redefine the target protocol explicitly, or (c)
++drop the like-for-like plan. **No training launched; nothing touched.**
