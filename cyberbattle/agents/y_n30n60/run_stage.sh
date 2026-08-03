@@ -60,7 +60,8 @@ for N in "${!CELLS[@]}"; do
     rf=$(ls -dt "$AG"/logs/yN${N}_s${S}_stg${STAGE}_* 2>/dev/null | head -1)
     [ -n "$rf" ] && cargs+=(--run "seed${S}=$rf")
   done
-  vf="$OUT/verdict_N${N}.txt"
+  mkdir -p "$AG/y_n30n60/verdicts"
+  vf="$AG/y_n30n60/verdicts/stage${STAGE}_N${N}.txt"   # NOT gitignored (stage*/ is) -- verdicts are the result
   {
     echo "=== F4 BAND CHECK  cell N=$N  stage=$STAGE  (absolute $((STAGE*250))k) ==="
     "$PY" compute_convergence_check.py "${cargs[@]}" 2>&1 | grep -vE "Warning|warn"
