@@ -23,6 +23,12 @@ SPECS=("$@")
 AG=/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/cyberbattle/agents
 PY=/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/bin/python
 export LD_LIBRARY_PATH=/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib:${LD_LIBRARY_PATH:-}
+# THREAD CAP (critical): the env step is single-threaded Python; the policy nets are tiny. Left
+# uncapped, each of the ~10 concurrent PyTorch procs spawns ~ncore intra-op threads -> ~320 threads
+# on 32 cores, load ~116, fps collapses 245 -> 4 (aggregate WORSE than one proc). Cap every math
+# backend to 1 thread so the procs coexist without scheduler thrashing (must be set before python
+# imports torch/numpy). Measured effect: restores per-proc fps to near the single-proc rate.
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 OUT="$AG/y_n30n60/stage${STAGE}"
 mkdir -p "$OUT"
 cd "$AG"
