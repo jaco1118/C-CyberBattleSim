@@ -1,0 +1,5 @@
+drift source: cyberbattle/agents/attenuation_step3_logs  | drift col: agent_drift_full  | score proxy: agent_action_succeeded (binary reward>0)
+    band    n_steps   point_biserial_r      p_value   mean_drift|succ=1  mean_drift|succ=0
+   10-15     180972             0.5376     0.00e+00              0.5238             0.0295
+   30-40     631918             0.5204     0.00e+00              0.5135             0.0149
+  80-100     769514             0.5299     0.00e+00              0.6342             0.0106
