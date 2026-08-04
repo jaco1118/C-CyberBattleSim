@@ -95,4 +95,14 @@ does NOT show the same fast-convergence pattern despite its much lower degree (~
 Stage 2 (250k->500k) launched immediately per the pre-agreed staged schedule, resuming from
 stage-1 checkpoints. Verdict: `y2_n50/verdicts/stage1_N50.txt` (commit `758c383`).
 
+## Stage 2 result (500k) [FINDING]
+
+**NOT CONVERGED.** mean|Delta%|=4.37% (<5%, passes the mean threshold) but 3/5 within band (need
+>=4). seed123 -2.52% YES, seed200 -1.50% YES, seed300 -0.67% YES (all newly within band); seed42
++6.99% no, seed100 +10.15% no (both were within band or close at stage 1, now worse). Verdict:
+`y2_n50/verdicts/stage2_N50.txt` (commit `095975b`).
+
+Stage 3 (500k->750k) launched at 23:08 BST, ~42 min before the 2350 cutoff -- may not finish in
+time; this is expected and covered by the 25k-step checkpointing (see resume procedure above).
+
 <!-- Further stage results appended below as they land. -->
