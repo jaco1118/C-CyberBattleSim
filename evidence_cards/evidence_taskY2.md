@@ -105,4 +105,29 @@ stage-1 checkpoints. Verdict: `y2_n50/verdicts/stage1_N50.txt` (commit `758c383`
 Stage 3 (500k->750k) launched at 23:08 BST, ~42 min before the 2350 cutoff -- may not finish in
 time; this is expected and covered by the 25k-step checkpointing (see resume procedure above).
 
-<!-- Further stage results appended below as they land. -->
+## Stage 3 result (750k) [FINDING] — session stopped here, environment cutoff
+
+**NOT CONVERGED, and worse than either prior stage.** mean|Delta%|=11.46% (>=5%, the worst of all
+3 stages), **0/5 within band** -- every seed missed, including seed123/200/300 which were all
+solid at stage 2 (all three reversed direction). Verdict: `y2_n50/verdicts/stage3_N50.txt`
+(commit `b89d9f6`).
+
+Finished at 23:47 BST, 3 minutes before the 2350 environment cutoff. **Stage 4 NOT launched** --
+no time remaining to do so safely. Session stops here per the environment cutoff; resume procedure
+above applies if/when this environment is available again (stage-3 final checkpoints are saved and
+complete, plus the 25k-granularity trail beneath them).
+
+## Status at cutoff [ARTIFACT -- summary for resumption]
+
+3 of 5 authorized stages complete (250k/500k/750k), none converged, trend WORSENING not improving
+(mean|Delta%|: 7.09% -> 4.37% -> 11.46%; within-band count: 2/5 -> 3/5 -> 0/5). Two stages remain
+under the pre-agreed hard cap (stage 4 = 1M, stage 5 = 1.25M) if/when authorized to continue.
+
+**Preliminary read against the task's own question** (does lower degree fix Task Y's convergence
+problem?): so far, NO -- this pilot has been LESS stable through 750k than Task Y's own N=60 cell
+was at the equivalent point (N=60's stage 3 verdict, for comparison: NOT CONVERGED, mean 7.61%,
+3/5 within band -- better on both counts than this pilot's stage 3). Preliminary, not final --
+Task Y's N=60 also fluctuated stage to stage before its own final (non-converged, capped) verdict,
+so this pilot's remaining 2 stages could still move either direction. Full comparison against
+Task Y's N=60 cell reserved for the final report once stages 4-5 are run or the pilot is
+otherwise concluded.
