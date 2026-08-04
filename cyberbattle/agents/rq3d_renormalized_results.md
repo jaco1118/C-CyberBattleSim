@@ -83,3 +83,54 @@ Added specifically because the pooled ranking gives 10-15 zero representation (s
 - Churn (pooled, not recomputed here -- out of this task's scope): top-decile-loss = 0.36, rest = 0.50.
 - Source: rescued findings text at commit 1d6aaab (evidence_taskCX.md PART 3 section 3.9, never merged into the live card). Same checkpoint population as this rollout (Addendum 5 Branch A); ranking metric confirmed different (scale confound finding above).
 
+
+## ADDENDUM 7 — behavioural-residual ranking: does it resolve the reversal? [FINDING, does NOT cleanly resolve]
+
+Pure analysis on already-collected data (no new episodes). Script: `compute_rq3d_behavioural_residual.py`.
+
+**STEP 2 (re-checked against the rescued text):** commit 1d6aaab's section 3.8 states the exact
+formula, per episode: `residual = loss - gross mechanical`. Section 3.5's band-level table treats
+"mechanical" and "root departures/ep" as the same quantity, so "gross mechanical" for one episode
+is read literally as `root_owned_departures` (same units as loss, no regression scaling implied).
+**Important: section 3.9 explicitly ranks on "positive-LOSS episodes", not "positive-residual".**
+The rescued text does NOT indicate the original top-decile ranking itself was residualized -- the
+residual formula in 3.8 is used for a separate regression (behavioural residual ~ churn/type), not
+for 3.9's ranking. No code implementing this ranking survives (`compute_attenuation_analysis.py`,
+the only committed CX driver, has no decile/residual logic -- it is a data-collection script only).
+So this residualized ranking is an EXPLORATORY check on this rollout's own data, not a reproduction
+of a residualized original ranking.
+
+**STEP 3/4 result -- three rankings side by side, pooled departures comparison:**
+
+| ranking | top mean departures | rest mean departures | direction | resolved? |
+|---|---|---|---|---|
+| Original CX PART 3 (different population) | 0.70 | 1.23 | FEWER in top group | (reported as resolved in original text) |
+| (a) This rollout, raw-loss ranking | 4.160 | 2.576 | **MORE** in top group | YES (CI excludes 0) |
+| (b) This rollout, behavioural-residual ranking | 2.190 | 2.451 | **FEWER** in top group (matches original's direction) | **NO** (95% CI [-0.549, +0.041] brackets 0) |
+
+**Renormalized (dep/static-root) under ranking (a), pooled:** top = 0.1637, rest = 0.1637 --
+essentially identical. Confirmed NOT a bug (cross-checked against the per-band figures already
+reported: weighted average of the per-band numbers reproduces 0.1638/0.1637 exactly). This is a
+genuine pooling/composition artifact: the top-decile group is disproportionately drawn from 30-40
+(moderate renormalized excess) while "rest" includes a large share of 10-15 (the highest
+renormalized rate of any band, ~0.21, despite zero top-decile representation there) -- these
+compositional differences cancel at the pooled level. **The pooled renormalized figure is
+therefore not a reliable summary; the per-band breakdown already reported above is the trustworthy
+view.**
+
+**CIRCULARITY, both directions, stated plainly:** ranking (a)'s reversal-from-original is
+consistent with `loss` being mechanically entangled with departures (loss is built from
+final_root_owned_count, which departures deplete) -- a POSITIVE bias toward more departures in
+high-loss episodes, expected in part by construction. Ranking (b) flips the SIGN back toward the
+original's direction, BUT it does so by directly subtracting departures out of the ranking
+variable -- a NEGATIVE bias toward fewer departures in high-residual episodes, ALSO expected in
+part by construction, and symmetric to ranking (a)'s caveat.
+
+**CONCLUSION [per Addendum 7's stop condition -- does not cleanly resolve, stopping here]:** this
+does not cleanly separate "different checkpoint population" from "different loss definition" as
+the explanation for the reversal from the original. The residualized ranking moves the direction
+back toward the original's qualitative pattern, which is *consistent with* the metric-definition
+explanation mattering -- but the result is not statistically resolved at this sample size, and the
+residualization itself is circular in the opposite direction from ranking (a), so it cannot serve
+as independent confirmation. **Both raw findings are reported honestly, side by side, with this
+caveat, per Addendum 7's explicit instruction not to chase this further with a new rollout.**

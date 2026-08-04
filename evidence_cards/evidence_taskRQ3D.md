@@ -95,6 +95,38 @@ Full per-band tables, bootstrap CIs, and both caveats (gross-count, donor-pool) 
 `cyberbattle/agents/rq3d_renormalized_results.md` (committed `3d8c9aa`, alongside the 6 small
 per-episode `event_episode.jsonl` files themselves and `compute_rq3d_renormalize.py`).
 
+## Addendum 7 — does a behavioural-residual ranking resolve the reversal? [FINDING — no, does not cleanly resolve]
+
+Pure analysis on already-collected data, no new episodes. Re-checked the rescued text (commit
+`1d6aaab` §3.8): the exact formula is `residual = loss - gross mechanical` (mechanical read
+literally as `root_owned_departures`, same units, per §3.5's identical usage) — but **§3.9
+explicitly ranks on "positive-loss episodes", not residual**, so the rescued text does not
+evidence a residualized original ranking; no surviving code implements one either
+(`compute_attenuation_analysis.py` has no decile/residual logic). This exercise is therefore
+exploratory on this rollout's own data, not a reproduction of a residualized original method.
+
+Three rankings compared (pooled departures, top-decile vs rest): original (0.70 < 1.23, fewer in
+top group) vs this rollout's raw-loss ranking (4.16 > 2.58, more in top group, **resolved**) vs
+this rollout's behavioural-residual ranking (2.19 < 2.45, fewer in top group — **matches the
+original's direction** — but 95% CI [-0.549, +0.041] brackets 0, **not resolved**). The
+residualized ranking moves the direction back toward the original, consistent with the
+metric-definition explanation mattering, but the result isn't statistically resolved and the
+residualization is circular in the opposite direction from the raw-loss ranking (subtracting
+departures out of the ranking variable mechanically biases toward fewer departures in the top
+group, symmetric to how raw loss mechanically biased toward more). **Does not cleanly separate
+"different checkpoint population" from "different loss definition" as the cause of the reversal —
+per Addendum 7's explicit stop condition, both raw findings are reported honestly side by side
+with this caveat, no further rollout launched to chase it.**
+
+Also found while re-running the pooled comparison: the pooled RENORMALIZED figure under the
+raw-loss ranking is a near-exact tie (0.1637 vs 0.1637) — confirmed a genuine pooling/composition
+artifact (verified by reproducing it from the already-reported per-band figures), not a bug. The
+per-band breakdown remains the trustworthy view; the pooled renormalized number should not be
+read as "no effect."
+
+Committed: `compute_rq3d_behavioural_residual.py`, results appended to
+`rq3d_renormalized_results.md`.
+
 ## Standing rules adopted from this task [record, project-wide — see `standing_rules.md`]
 
 - **SR-1:** commit manifests/configs alongside scripts, not just scripts.
