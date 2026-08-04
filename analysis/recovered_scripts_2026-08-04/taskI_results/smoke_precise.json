@@ -1,0 +1,45 @@
+{
+  "n_label": "N10_precise",
+  "topology_pkl": "/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/cyberbattle/data/env_samples/scalability_10_15/1/network_SecureBERT.pkl",
+  "n_nodes_ground_truth": 10,
+  "precise_flags": true,
+  "sample_subset_samples": 100,
+  "outer_results": [
+    {
+      "outer_repeat": 0,
+      "n_nodes_ground_truth": 10,
+      "n_discovered_final": 5,
+      "n_owned_final": 4,
+      "n_visible_graph_nodes": 5,
+      "n_visible_graph_edges": 11,
+      "n_action_embeddings_final": 435,
+      "encode_times_s": [
+        0.001219418947584927,
+        0.0012545438949018717,
+        0.0011743130162358284,
+        0.0011619499418884516,
+        0.001151219941675663
+      ],
+      "encode_mean_s": 0.0011922891484573484,
+      "encode_std_s": 4.3422252319885626e-05,
+      "action_space_times_s": [
+        0.0006786329904571176,
+        0.0006014290265738964,
+        0.0005841460078954697,
+        0.0005717430030927062,
+        0.000572283985093236
+      ],
+      "action_space_mean_s": 0.0006016470026224852,
+      "action_space_std_s": 4.469231096946925e-05,
+      "match_times_s": [
+        0.00025253393687307835,
+        0.00022834900300949812,
+        0.00022842898033559322,
+        0.00023070292081683874,
+        0.00022430007811635733
+      ],
+      "match_mean_s": 0.00023286298383027316,
+      "match_std_s": 1.1235791359989127e-05
+    }
+  ]
+}

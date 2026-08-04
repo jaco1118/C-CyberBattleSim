@@ -1,0 +1,62 @@
+{
+  "mean_time_per_encode_call_s": {
+    "label": "GAE encode() -- mean wall-clock per call",
+    "best_fit": "linear",
+    "best_r2": 0.5349619389850943,
+    "power_law_exponent": 0.5691804044928485,
+    "power_law_ci95": [
+      -0.009228039988097736,
+      1.1475888489737947
+    ]
+  },
+  "mean_time_per_action_match_s": {
+    "label": "find_closest_action_embedding -- mean wall-clock per call",
+    "best_fit": "linear",
+    "best_r2": 0.49580405880995926,
+    "power_law_exponent": 1.1696030975394207,
+    "power_law_ci95": [
+      -0.6250612544063012,
+      2.964267449485143
+    ]
+  },
+  "action_space_creation_time_total_s": {
+    "label": "create_continuous_action_space -- total per-episode (300 steps)",
+    "best_fit": "linear",
+    "best_r2": 0.21402844987881728,
+    "power_law_exponent": 0.5689322576387692,
+    "power_law_ci95": [
+      -0.9014172465041348,
+      2.039281761781673
+    ]
+  },
+  "mean_wallclock_per_step_s": {
+    "label": "TOTAL mean wall-clock per env step (sum of tracked components)",
+    "best_fit": "linear",
+    "best_r2": 0.5051709300375096,
+    "power_law_exponent": 0.9897230584537429,
+    "power_law_ci95": [
+      -0.364871134215776,
+      2.344317251123262
+    ]
+  },
+  "mean_inner_step_time_s": {
+    "label": "step_attacker_env (base env simulation) -- mean wall-clock per step",
+    "best_fit": "linear",
+    "best_r2": 0.49011626456855356,
+    "power_law_exponent": 0.6625617164673969,
+    "power_law_ci95": [
+      -0.06612859333656762,
+      1.3912520262713615
+    ]
+  },
+  "encode_calls_per_episode": {
+    "label": "encode() calls per episode (300-step episode)",
+    "best_fit": "linear",
+    "best_r2": 0.18352371177799331,
+    "power_law_exponent": 0.14995805441168078,
+    "power_law_ci95": [
+      -0.0827070443022957,
+      0.38262315312565726
+    ]
+  }
+}
