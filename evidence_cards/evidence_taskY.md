@@ -1,8 +1,12 @@
-# Task Y — the equal-degree scenario set (STEP 0 pilot)
+# Task Y — the equal-degree scenario set (STEP 0 pilot -> STEP 1 executed)
 
 Zero-shot design (no retraining): three sizes (30/60/90 nodes) at ONE held-constant mean degree (~22), giving
 SAME-degree-varying-size (30/60/90 @ deg 22) and SAME-size-varying-degree (90 @ 22 vs existing 80-100 @ 54.9).
 STEP 0 is a small pilot with a hard gate. Ran alongside the 750k training.
+
+**STATUS: STEP 1 (execution) complete -- see bottom of card.** N=30 CONVERGED, N=60 and N=90 both
+NOT CONVERGED (hard cap / borderline). No RQ1(c) conclusion drawn (out of scope). Full per-cell tables,
+the N=90 correction, and the N=60 degree-metric bugfix are in STEP 1 below.
 
 ## 0.1 CLARIFICATION — the DEGREE reconciliation table (read-only) [FINDING]
 
@@ -234,3 +238,117 @@ wider than the target-28 plan's would have been. **Decision is the user's** (not
 at target ~20 across 30/60/90; (ii) 60/90-only at ~28; or (iii) the pre-registered STEP 3.3 fallback.
 **Amendments 1 (realised discovered-subgraph degree) and 2 (static-cell reporting) apply at STEP 2, if a design
 is chosen** — and STEP 2 stays queued behind Task L STEP 3 + OI-1 probe + RQ2(c) counterfactual regardless.
+
+## STEP 1 — DECISION + EXECUTION: equal-degree ~20 across N=30/60/90 [FINDING]
+
+Decision taken: option (i) from the GATE OUTCOME above -- equal-degree design at target ~20 across all
+three sizes, using the p-ranges from the revivability table (30 `[0.2,0.8]`, 60 `[0.1,0.3]`, 90's
+existing `[0.05,0.15]`-family pilot topologies reused/extended). Branch: `taskY-probe-n90`.
+
+### 1.1 N=90 cell: probe -> 5-seed batch -> extension -> FINAL corrected verdict
+
+N=90 seed42 trained first as a probe (static500k, then resumed to 750k), then escalated to a full
+5-seed batch (seeds 100/123/200/300, static500k each), with seeds failing the F4 band rule at 750k
+extended further. Convergence rule (F4, from `evidence_taskF4.md`): metric `train/Root owned nodes`,
+50k windows, per-seed within-band iff |Delta%|<5%, band CONVERGED iff mean|Delta%|<5% AND >=4/5 seeds
+within-band.
+
+**Per-seed final training leg and F4 result (recomputed fresh 2026-08-03/04, script-reproducible):**
+
+| seed | final step | Delta% | within? |
+|---|---|---|---|
+| 42  | 1.25M (750k + 500k ext) | +1.09%  | YES |
+| 100 | 1.25M (750k + 500k ext) | -13.90% | no  |
+| 123 | 500k (never extended)   | -4.10%  | YES |
+| 200 | 500k (never extended)   | +1.28%  | YES |
+| 300 | 750k (one extension)    | -5.01%  | no  |
+
+mean|Delta%| = 5.08% (>=5%), within-band = 3/5 (need >=4) -> **NOT CONVERGED**. seed300 misses by a
+near-boundary margin (-5.01% vs the 5.00% threshold).
+
+**CORRECTION (logged 2026-08-04):** an earlier informal, never-committed claim of "N=90 CONVERGED
+(4/5)" was made in conversation before this session's context was compacted. That number does not
+appear in any commit or artifact. The table above is a fresh, script-reproducible recomputation
+(verified against raw tfevents data, no missing run folders) and **supersedes** the earlier claim.
+Treat any reference to "N=90 converged" predating this card update as stale.
+
+Command/script: `cyberbattle/agents/compute_convergence_check.py` (committed 4173c53, "Task Y-N90-EXTEND:
+commit F4 convergence-rule window-extraction script" -- reproduces the prior inline 750k numbers
+seed42 -9.61%/seed100 +10.00% with `--stop 250000`), re-run at each seed's actual final leg. Output
+preserved: `cyberbattle/agents/y_n30n60/verdicts/N90_final_recomputed.txt` (committed c455dd9).
+Run folders: `cyberbattle/agents/logs/yprobe_n90*` (gitignored, on-machine).
+
+**N=90 degree bookkeeping:** the cell's degree span is genuinely WIDE per-topology (knows out-degree
+18.9-27.4 across the 5 instances, mean 21.53, SD 3.39) -- confirmed via a separate check
+(`cyberbattle/agents/y_n30n60/verify_n90_degree.py`, committed 8258f1f) that this span uses the correct
+control metric (knows out-degree, #1 in the 0.1 reconciliation table above) and predates -- is NOT
+affected by -- the N=60 degree-metric bug described in 1.2 below.
+
+### 1.2 Y-N30-N60: crossed cells (N=30, N=60) at the same target
+
+10 fresh topologies generated (5 seeds x {N=30, N=60}), p-ranges per the table above. Measured on the
+CALIBRATED control metric (knows_graph out-degree, #1): **N=30 = 19.69 +/- 1.18, N=60 = 19.93 +/- 2.82**
+-- degree IS approximately held constant across these two cells on the metric the design controls.
+
+**Degree-metric bug + fix (mid-session correction):** an early version of the topology-measurement
+script (`measure_topos.py`) reported mean UNDIRECTED degree of the `access_graph` (a different graph,
+inflated by reachability, and a different convention -- undirected vs out-degree) and mislabelled it
+"degree", producing a spurious "N=60=44.5 vs N=30=22.4, degree not held constant" alarm. Investigated
+and fixed (committed a2c8285): the calibrated metric (knows out-degree) shows the two cells match
+closely (~19.9 vs ~19.7); the 44.5 figure was an artifact of the knows graph being only ~34%
+reciprocal at N=60 (vs ~68% at N=30) plus the access graph's reachability inflation. No generation
+error, no regeneration needed. Script now reports knows out-degree as the primary control metric.
+Committed: `cyberbattle/agents/y_n30n60/measure_topos.py` + `topo_measurements.csv` (a2c8285, 158f4a8).
+
+**Pre-registered checkpoint stopping rule:** train in 250k increments ("stages"); F4-check each cell
+after every stage; stop a cell at the first stage that CONVERGES; hard cap 1.25M (stage 5). Orchestrator:
+`cyberbattle/agents/y_n30n60/run_stage.sh` (committed 158f4a8; thread-capped at 8db44d3 after an initial
+launch hit 60x CPU-oversubscription -- 10 uncapped procs on 32 cores, load ~116, fps 3-5/proc vs 245
+single-proc -- fixed via `OMP/MKL/OPENBLAS/NUMEXPR/VECLIB_NUM_THREADS=1`, restoring ~84 fps mean).
+
+**N=30 result: CONVERGED at stage 1 (250k).** mean|Delta%|=4.18%, 4/5 within band. Cell done, no
+further training. Verdict: `y_n30n60/verdicts/stage1_N30.txt` (e621f6c).
+
+**N=60 result: NOT CONVERGED, ran all 5 stages to the 1.25M hard cap.**
+
+| stage | absolute step | mean\|Delta%\| | within-band | verdict |
+|---|---|---|---|---|
+| 1 | 250k  | 6.97% | 2/5 | NOT CONVERGED |
+| 2 | 500k  | 6.55% | 2/5 | NOT CONVERGED |
+| 3 | 750k  | 7.61% | 3/5 | NOT CONVERGED |
+| 4 | 1M    | 8.62% | 2/5 | NOT CONVERGED (worst) |
+| 5 | 1.25M | 4.52% | 3/5 | NOT CONVERGED (best mean, still <4/5) |
+
+Non-monotonic trajectory (not steadily approaching or receding from convergence): per-seed pass/fail
+flips almost every stage (e.g. seed123 converged at stage1, failed stages 2-3, recovered stage3-5;
+seed300 within-band at every stage 1-4, missed only the final stage 5). Only the count criterion
+(>=4/5) ever failed at stage 5 -- the mean criterion (<5%) actually passed there. Verdicts:
+`y_n30n60/verdicts/stage{1,2,3,4,5}_N60.txt` (e621f6c, 3ab40d4, f65ea5b, 3a0bcac, c455dd9).
+
+### 1.3 FINAL three-way comparison (N=30 / N=60 / N=90) -- no RQ1(c) conclusion drawn
+
+| | N=30 | N=60 | N=90 |
+|---|---|---|---|
+| control metric (knows out-deg) | 19.69+/-1.18 | 19.93+/-2.82 | 18.9-27.4 (wide, per-topology) |
+| mean\|Delta%\| | 4.18% | 4.52% | 5.08% |
+| within-band | 4/5 | 3/5 | 3/5 |
+| **verdict** | **CONVERGED (250k)** | **NOT CONVERGED (hit 1.25M cap)** | **NOT CONVERGED (borderline)** |
+| training used | 1.25M total (5x250k) | 6.25M total (5 seeds x 1.25M) | 4.75M total (mixed per-seed) |
+
+**No RQ1(c) conclusion drawn from this table (explicitly out of scope for this task).** The three cells
+differ in topology count, degree-spread, and stopping history and are NOT a controlled N-only sweep --
+N=30's fast convergence, N=60's persistent instability, and N=90's near-boundary miss are reported as
+observations, not as evidence of any N-vs-convergence-difficulty relationship.
+
+### 1.4 Artifacts (all committed, branch `taskY-probe-n90` unless noted)
+
+- `cyberbattle/agents/compute_convergence_check.py` -- F4 rule engine (4173c53)
+- `cyberbattle/agents/y_n30n60/run_stage.sh` -- staged-training orchestrator, thread-capped (158f4a8, 8db44d3)
+- `cyberbattle/agents/y_n30n60/y_base.yaml` -- N=30/N=60 base training config (158f4a8)
+- `cyberbattle/agents/y_n30n60/measure_topos.py` + `topo_measurements.csv` -- degree/vuln measurement, bug-fixed (158f4a8, a2c8285)
+- `cyberbattle/agents/y_n30n60/verify_n90_degree.py` -- N=90 degree-bug-scope check (8258f1f)
+- `cyberbattle/agents/y_n30n60/generation_configs/` -- the 10 topology-generation recipes (158f4a8)
+- `cyberbattle/agents/y_n30n60/seeds/`, `seeds_all/` -- in-repo stable seed folders (158f4a8)
+- `cyberbattle/agents/y_n30n60/verdicts/` -- every stage's F4 output, N=30/N=60/N=90 (e621f6c..c455dd9)
+- Topology binaries (234MB, 10 folders) gitignored per repo convention; off-machine backup only.
+- Y-N30-N60/N=90 Part 2 (O8 Arm 4) work continues on `rq2b-10-15`, unrelated to this card's scope.
