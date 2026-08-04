@@ -61,4 +61,28 @@ only in single-cell/glob-based topology lookup).
 
 **Stage 1 (250k, all 5 seeds) launched 2026-08-04 21:50 BST.**
 
+## HOW TO RESUME if the session/environment cuts off mid-run [ARTIFACT — read this first]
+
+Everything except the in-progress training run is already committed on branch `taskY2-pilot-n50`
+(topology configs, seeds, `y2_base.yaml`, `run_stage.sh`, this card). `checkpoints_save_freq=25000`
+(tightened from Y-N30-N60's 50000 specifically for this) means at most 25k steps per seed are ever
+at risk, not the whole 250k stage.
+
+**To resume, for each seed:**
+1. Find the latest surviving checkpoint:
+   `ls -t logs/yN50_s<seed>_stg1_*/TRPO_x_control_SecureBERT/checkpoints/1/checkpoint_*_steps.zip | head -1`
+2. Relaunch with `--finetune_model <that path, RELATIVE TO logs/>` — e.g.
+   `train_agent.py --train_config y2_n50/y2_base.yaml --name yN50_s<seed>_resume --load_envs graphs_yN50_s<seed>_<ts> --load_seeds y2_n50/seeds/seeds_<seed> --finetune_model yN50_s<seed>_stg1_<ts>/TRPO_x_control_SecureBERT/checkpoints/1/checkpoint_<N>_steps.zip`
+   (same resume mechanism used throughout this project for every staged run, e.g. Y-N60's
+   stage-to-stage extensions). VecNormalize rebuilds fresh on resume — documented, accepted
+   transient, not a bug.
+3. If a seed has no checkpoint at all, relaunch it fresh (`--finetune_model NONE`) — nothing lost
+   for that seed, just a normal cold start.
+4. If stage 1 fully completes before a cutoff, the F4 check + verdict is already appended below;
+   proceed to stage 2 (`run_stage.sh 2 ...`) the same way Y-N30-N60 did, only if stage 1 did NOT
+   converge.
+
+**Checkpoint state as of 2026-08-04 22:02 BST** (~40% through stage 1, all 5 seeds healthy, zero
+errors): seed42 75k, seed100 100k, seed123 100k, seed200 75k, seed300 75k / 250k target.
+
 <!-- Stage results appended below as they land. -->
