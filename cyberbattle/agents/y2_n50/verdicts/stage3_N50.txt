@@ -1,0 +1,12 @@
+=== F4 BAND CHECK  cell N=50 (degree ~12.5)  stage=3  (absolute 750k) ===
+metric='train/Root owned nodes'  window=50000  threshold=5.0%
+       run       stop       pre       fin    Delta%  within?
+    seed42     253952    21.250    24.083   +13.33%       no
+   seed100     253952    23.000    19.500   -15.22%       no
+   seed123     253952    22.500    19.750   -12.22%       no
+   seed200     253952    21.583    23.667    +9.65%       no
+   seed300     253952    26.583    24.750    -6.90%       no
+
+mean|Delta%| = 11.46%  (>=5.0%)
+within-band  = 0/5  (need >= 4)
+BAND VERDICT (F4 rule): NOT CONVERGED
