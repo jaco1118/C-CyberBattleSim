@@ -18,3 +18,27 @@ wildly variable" requirement). Matches Task Y's own experience of needing ~2 cal
 iterations, not one.
 
 Used for the final 5-seed generation (`generation_configs/genconfig_yN50_s{42,100,123,200,300}.yaml`).
+
+## CORRECTION: final-generation bug (discovered post-generation, fixed before training)
+
+The final 5-seed generation call omitted `--num_graphs 1` on the CLI. `generate_graphs.py`'s
+`--num_graphs` is a CLI flag (default **5**), separate from the generation-config YAML's
+`num_graphs: 1` key -- which the script does not actually read to control graph count. Result:
+each seed's call produced **5** valid topology candidates (all passed generation-time validity
+checks, no rejections; log: "Generation of 5 graphs completed successfully!"), not 1 as intended
+-- inconsistent with Task Y's own convention of exactly 1 topology per seed folder (confirmed
+against `graphs_yN30_s42_.../` which has only subdir `1`).
+
+**Caught before training completed any steps** (crashed immediately for an unrelated reason --
+the gae-config branch issue below -- giving time to notice this on relaunch). Fix: subdir `1` in
+each seed's folder is the exact topology already measured for calibration (mean degree 12.50,
+SD 1.67, reported above) -- kept; subdirs `2`-`5` (unmeasured, unused) deleted. Final topology set
+used for training is therefore exactly the one already reported, one topology per seed, matching
+Task Y's convention.
+
+Separately (unrelated bug, also caught and fixed before any training steps ran): the frozen GAE
+encoder's config files (`model_spec.yaml`, `train_config_encoder.yaml`) were tracked only on
+`attenuation-pooling-scale` (force-added there in the commit audit); creating this branch from
+`taskY-probe-n90` meant they were untracked here, and `git checkout` removed them from disk when
+switching branches. Restored via `git show attenuation-pooling-scale:...` and re-tracked on this
+branch too (commit `c6772a7`).
