@@ -85,4 +85,14 @@ at risk, not the whole 250k stage.
 **Checkpoint state as of 2026-08-04 22:02 BST** (~40% through stage 1, all 5 seeds healthy, zero
 errors): seed42 75k, seed100 100k, seed123 100k, seed200 75k, seed300 75k / 250k target.
 
-<!-- Stage results appended below as they land. -->
+## Stage 1 result (250k) [FINDING]
+
+**NOT CONVERGED.** mean|Delta%|=7.09% (>=5%), 2/5 within band (need >=4). seed42 +0.82% YES,
+seed100 +8.12% no, seed123 -11.29% no, seed200 -2.70% YES, seed300 +12.50% no (worst miss).
+
+Unlike Task Y's own N=30 cell (which converged cleanly at this exact same first stage), this pilot
+does NOT show the same fast-convergence pattern despite its much lower degree (~12.5 vs Y's ~20).
+Stage 2 (250k->500k) launched immediately per the pre-agreed staged schedule, resuming from
+stage-1 checkpoints. Verdict: `y2_n50/verdicts/stage1_N50.txt` (commit `758c383`).
+
+<!-- Further stage results appended below as they land. -->
