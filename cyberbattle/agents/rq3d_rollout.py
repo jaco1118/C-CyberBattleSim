@@ -57,14 +57,7 @@ LG.addHandler(logging.NullHandler())
 
 SEEDS = [42, 100, 123, 200, 300]
 BANDS = ["10-15", "30-40", "80-100"]
-BAND_TOPO_SOURCE = {"10-15": "scalability_10_15", "30-40": "scalability_30_40", "80-100": "scalability_80_100"}
-BAND_TS = {
-    "10-15": {42: "2026-07-26_11-56-51", 100: "2026-07-26_12-06-37", 123: "2026-07-26_12-16-24",
-              200: "2026-07-26_12-25-43", 300: "2026-07-26_12-35-30"},
-    "30-40": {42: "2026-07-26_12-47-19", 100: "2026-07-26_13-04-57", 123: "2026-07-26_13-21-32",
-              200: "2026-07-26_13-38-29", 300: "2026-07-26_13-55-49"},
-    "80-100": {s: "2026-07-26_14-47-54" for s in SEEDS},
-}
+MANIFEST_PATH = os.path.join(AG, "rq3d_manifest.yaml")  # committed (standing rule: manifests, not just scripts)
 N_CHANGE_EP = 15   # per (seed, topology)
 N_STATIC_EP = 10   # per (seed, topology)
 
@@ -78,9 +71,8 @@ _SKIP = {"train_iterations", "nlp_extractor", "algorithm", "algorithm_hyperparam
          "node_embeddings_dimensions", "rewards_dict", "penalties_dict", "initial_environment", "logger"}
 
 
-def run_folder(band, seed):
-    return os.path.join(AG, "logs", f"trpo_250k_tuned_compressed_band{band}_seed{seed}_{BAND_TS[band][seed]}",
-                         "TRPO_x_control_SecureBERT")
+def run_folder(manifest, band, seed):
+    return os.path.join(AG, manifest["bands"][band]["run_folders"][seed])
 
 
 def load_encoder():
@@ -141,20 +133,18 @@ def main():
     ap.add_argument("--n-static", type=int, default=N_STATIC_EP)
     a = ap.parse_args()
 
-    import json
     REWARDS = yaml.safe_load(open(os.path.join(AG, "config", "rewards_config.yaml")))
-    grid_map = json.load(open(os.path.join(
-        ROOT, "attenuation_gate_archive", "2026-07-26_trpo_5seed_gate", "grid_topology_id_map.json")))
+    manifest = yaml.safe_load(open(MANIFEST_PATH))
     enc, nd = load_encoder()
 
     bands = [a.band] if a.band else BANDS
     seeds = [a.seed] if a.seed else SEEDS
 
     for band in bands:
-        topo_ids = list(grid_map[band].values())  # 8 topology IDs for this band, standard grid order
-        topo_source = BAND_TOPO_SOURCE[band]
+        topo_ids = manifest["bands"][band]["topology_ids"]  # 8 topology IDs for this band, standard grid order
+        topo_source = manifest["bands"][band]["topology_source_folder"]
         for seed in seeds:
-            rf = run_folder(band, seed)
+            rf = run_folder(manifest, band, seed)
             cfg = yaml.safe_load(open(os.path.join(rf, "train_config.yaml")))
             ck = os.path.join(rf, "checkpoints", "1", "checkpoint_250000_steps.zip")
             vp = os.path.join(rf, "checkpoints", "1", "checkpoint_vecnormalize_250000_steps.pkl")

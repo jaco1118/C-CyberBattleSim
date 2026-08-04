@@ -1,0 +1,55 @@
+# RQ3D checkpoint/topology manifest -- committed alongside rq3d_rollout.py (standing rule,
+# 2026-08-04: "commit manifests and configs, not just scripts" -- see standing_rules.md).
+#
+# This is a clean copy of the recipe rq3d_rollout.py actually uses, combining two pieces that
+# were NOT both durably committed before this task:
+#   - checkpoint run folders: mirrors cyberbattle/agents/attenuation_manifest.yaml (already
+#     tracked in git) -- included here again so this task is self-contained and doesn't depend
+#     on cross-referencing a second file to know what it ran.
+#   - the 8 topology IDs per band: copied from attenuation_gate_archive/2026-07-26_trpo_5seed_gate/
+#     grid_topology_id_map.json, which is NOT tracked (the entire attenuation_gate_archive/
+#     directory is untracked -- `git status` confirms `?? attenuation_gate_archive/`). That file
+#     could be lost the same way the original CX pipeline's manifest was. This copy closes that
+#     gap for the specific data this task depends on.
+#
+# POPULATION IDENTITY (verified, not assumed -- see rq3d_rollout.py's own header and the RQ3D
+# task's Addendum 5): this is the standard 5-seed x 3-band checkpoint grid, DYNAMICALLY trained
+# (dynamic_mode='both' during training -- confirmed via app.log DynamicEnv events firing from
+# step 2 of training, NOT a static-trained population). This IS Task CX PART 3's own "adapted
+# gate checkpoints" (evidence_taskCX.md:272 names them "the... 'adapted' GATE checkpoints";
+# evidence_taskF1.md:14's "gate grid slot 3" matches this file's 30-40 topology "3": "44" entry
+# byte-for-byte; the archive folder is literally named "2026-07-26_trpo_5seed_gate"). Same
+# population RQ2(c) used (evidence_taskRQ2C.md: "same checkpoints/seeds/bands and the same
+# standard attenuation config").
+
+checkpoint_step: 250000
+episode_iterations: 300
+
+bands:
+  10-15:
+    topology_source_folder: scalability_10_15
+    topology_ids: ["61", "54", "62", "29", "4", "76", "1", "45"]   # grid_topology_id_map.json slots 1-8
+    run_folders:
+      42:  logs/trpo_250k_tuned_compressed_band10-15_seed42_2026-07-26_11-56-51/TRPO_x_control_SecureBERT
+      100: logs/trpo_250k_tuned_compressed_band10-15_seed100_2026-07-26_12-06-37/TRPO_x_control_SecureBERT
+      123: logs/trpo_250k_tuned_compressed_band10-15_seed123_2026-07-26_12-16-24/TRPO_x_control_SecureBERT
+      200: logs/trpo_250k_tuned_compressed_band10-15_seed200_2026-07-26_12-25-43/TRPO_x_control_SecureBERT
+      300: logs/trpo_250k_tuned_compressed_band10-15_seed300_2026-07-26_12-35-30/TRPO_x_control_SecureBERT
+  30-40:
+    topology_source_folder: scalability_30_40
+    topology_ids: ["15", "92", "44", "19", "32", "64", "50", "3"]  # slot 3 = "44" (F1's cited "gate grid slot 3")
+    run_folders:
+      42:  logs/trpo_250k_tuned_compressed_band30-40_seed42_2026-07-26_12-47-19/TRPO_x_control_SecureBERT
+      100: logs/trpo_250k_tuned_compressed_band30-40_seed100_2026-07-26_13-04-57/TRPO_x_control_SecureBERT
+      123: logs/trpo_250k_tuned_compressed_band30-40_seed123_2026-07-26_13-21-32/TRPO_x_control_SecureBERT
+      200: logs/trpo_250k_tuned_compressed_band30-40_seed200_2026-07-26_13-38-29/TRPO_x_control_SecureBERT
+      300: logs/trpo_250k_tuned_compressed_band30-40_seed300_2026-07-26_13-55-49/TRPO_x_control_SecureBERT
+  80-100:
+    topology_source_folder: scalability_80_100
+    topology_ids: ["10", "5", "67", "100", "90", "18", "17", "2"]
+    run_folders:
+      42:  logs/trpo_250k_tuned_compressed_band80-100_seed42_2026-07-26_14-47-54/TRPO_x_control_SecureBERT
+      100: logs/trpo_250k_tuned_compressed_band80-100_seed100_2026-07-26_14-47-54/TRPO_x_control_SecureBERT
+      123: logs/trpo_250k_tuned_compressed_band80-100_seed123_2026-07-26_14-47-54/TRPO_x_control_SecureBERT
+      200: logs/trpo_250k_tuned_compressed_band80-100_seed200_2026-07-26_14-47-54/TRPO_x_control_SecureBERT
+      300: logs/trpo_250k_tuned_compressed_band80-100_seed300_2026-07-26_14-47-54/TRPO_x_control_SecureBERT
