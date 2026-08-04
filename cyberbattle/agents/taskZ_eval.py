@@ -30,7 +30,7 @@ LG = logging.getLogger("z"); LG.addHandler(logging.NullHandler())
 # config keys that are NOT env constructor kwargs (training/orchestration only)
 _SKIP = {"train_iterations", "nlp_extractor", "algorithm", "algorithm_hyperparams", "policy_kwargs",
          "seeds_runs", "seeds", "static_seeds", "random_seeds", "load_seeds", "load_envs", "name",
-         "finetune_model", "num_runs", "verbose", "yaml", "extremal_mask", "switch_interval",
+         "finetune_model", "num_runs", "verbose", "yaml", "extremal_mask", "zero_graph_embeddings", "switch_interval",
          "val_switch_interval", "checkpoints_save_freq", "early_stopping", "n_val_episodes", "val_freq",
          "save_csv_file", "save_embeddings_csv_file", "load_processed_envs", "pca_components", "goal",
          "learning_rate", "learning_rate_type",
@@ -73,6 +73,9 @@ def eval_seed(ckpt, vecn_pkl, cfg, network, enc, nd, arm, condition, episodes):
             if arm == 3:
                 nobs = dict(nobs); nobs["graph_embeddings"] = np.array(nobs["graph_embeddings"], copy=True)
                 nobs["graph_embeddings"][64:192] = 0.0
+            elif arm == 4:  # O8: zero-graph-info floor, all 256 graph_embeddings dims
+                nobs = dict(nobs); nobs["graph_embeddings"] = np.array(nobs["graph_embeddings"], copy=True)
+                nobs["graph_embeddings"][:] = 0.0
             action, _ = model.predict(nobs)
             obs, _, done, _ = env.step(action)
             last_root = env.get_statistics()[14]

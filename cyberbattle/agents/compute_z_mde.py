@@ -6,11 +6,15 @@ seed, mean_root_owned, n_episodes) for the three-arm design at 10-15, and report
   Arms   : 1 = full 256-d [mean,max,min]  (full extremal info, 256-wide input)
            2 = mean-only 128-d [mean]     (no extremal info, 128-wide input)
            3 = 256-d extremal-zeroed      (no extremal info, 256-wide input)  <- capacity control
+           4 = 256-d ALL-zeroed (O8)      (zero graph info at all, 256-wide input) <- zero-info floor
 
   MDE    : the noise floor = pooled between-seed SD of the terminal root-owned COUNT under the
-           STATIC condition (dynamic_mode=none), pooled over the three arms' 5 seeds each (15 static
-           seeds). Static is the same env for all arms, so its between-seed spread is the pure
-           seed/eval noise the design can resolve. Reported in nodes and as % of the static mean.
+           STATIC condition (dynamic_mode=none), pooled over arms 1-3's 5 seeds each (15 static
+           seeds -- unchanged definition even when arm 4 data is present, so this figure stays
+           reproducible against the original 3-arm report). Static is the same env for all arms, so
+           its between-seed spread is the pure seed/eval noise the design can resolve. Reported in
+           nodes and as % of the static mean. Arm 4's static/change means are reported alongside for
+           context but excluded from the MDE pool.
 
   Arm contrasts (evaluated under the CHANGE condition, paired by seed since all arms share the
   same 5 seeds 42/100/123/200/300):
@@ -19,6 +23,9 @@ seed, mean_root_owned, n_episodes) for the three-arm design at 10-15, and report
      CAPACITY  = arm3 - arm2   both carry no extremal info; differ ONLY in input width (256 vs 128)
                                -> isolates the *capacity* (extra input dims) confound
      RAW       = arm1 - arm2   the naive full-vs-mean comparison, which confounds INFO + CAPACITY
+     FLOOR     = arm1 - arm4   (O8, only when arm 4 data present) full graph info vs ZERO graph
+                               info (discrete_features only) -- isolates whether graph_embeddings
+                               carries any usable signal at all, the most basic ablation
 
   Per contrast: paired mean diff, paired SD, and a 10,000-sample paired bootstrap 95% CI.
 
@@ -39,7 +46,8 @@ import numpy as np
 import pandas as pd
 
 SEED_ORDER = [42, 100, 123, 200, 300]
-ARM_LABEL = {1: "full-256 [mean,max,min]", 2: "mean-only-128 [mean]", 3: "256 extremal-zeroed"}
+ARM_LABEL = {1: "full-256 [mean,max,min]", 2: "mean-only-128 [mean]", 3: "256 extremal-zeroed",
+             4: "256 ALL-zeroed (O8 floor)"}
 
 
 def load(eval_dir):
@@ -98,10 +106,16 @@ def main():
             static_pool.append(sv)
             print(f"    arm{arm} {ARM_LABEL[arm]:<26}  static {np.nanmean(sv):6.3f}  "
                   f"change {np.nanmean(cv):6.3f}")
+        has_arm4 = 4 in df.arm.unique()
+        if has_arm4:
+            sv4 = seed_vec(df, 4, topo, "static"); cv4 = seed_vec(df, 4, topo, "change")
+            print(f"    arm4 {ARM_LABEL[4]:<26}  static {np.nanmean(sv4):6.3f}  "
+                  f"change {np.nanmean(cv4):6.3f}   (excluded from MDE pool below)")
+
         static_pool = np.concatenate(static_pool)
         mde = float(np.nanstd(static_pool, ddof=1))
         static_mean = float(np.nanmean(static_pool))
-        print(f"  MDE (pooled between-seed SD, static, n={np.sum(~np.isnan(static_pool))}): "
+        print(f"  MDE (pooled between-seed SD, static, n={np.sum(~np.isnan(static_pool))}, arms 1-3 only): "
               f"{mde:.3f} nodes = {100*mde/static_mean:.1f}% of static mean ({static_mean:.3f})")
 
         a1 = seed_vec(df, 1, topo, "change")
@@ -111,6 +125,9 @@ def main():
         contrast("INFO", a1, a3, mde)
         contrast("CAPACITY", a3, a2, mde)
         contrast("RAW", a1, a2, mde)
+        if has_arm4:
+            a4 = seed_vec(df, 4, topo, "change")
+            contrast("FLOOR", a1, a4, mde)
 
 
 if __name__ == "__main__":
