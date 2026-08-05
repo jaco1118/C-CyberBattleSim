@@ -1,0 +1,62 @@
+batch_size: 32
+default_vulnerability_embeddings_size: 768
+edge_feature_aggregations:
+- mean
+episode_iterations: 100
+holdout: true
+learning_rate: 0.01
+load_seeds: config
+model_config:
+  layers:
+  - NN_channels: 16
+    activation: 'null'
+    out_channels: 64
+    type: NNConv
+  - activation: 'null'
+    out_channels: 64
+    type: GCNConv
+name: GAE
+nlp_extractors:
+- distilbert
+- roberta
+- CySecBERT
+- SecBERT
+- SecRoBERTa
+- SecureBERT
+- gpt2
+- bert
+nlp_extractors_scalers:
+  SecBERT:
+    edge_feature_vector_weight: 2.2
+  SecRoBERTa:
+    edge_feature_vector_weight: 2.2
+  SecureBERT:
+    edge_feature_vector_weight: 3.85
+  gpt2:
+    edge_feature_vector_weight: 15.5
+    node_feature_vector_cont_weight: 2.5
+num_environments: 500
+num_runs: 1
+pca_components: 768
+proportional_cutoff_coefficient: 10
+random_seeds: false
+save_log_file: true
+seeds:
+- 42
+static_seeds: true
+switch_interval: 300
+train_config: config/train_config.yaml
+train_iterations: 10000
+val_interval: 1000
+val_iterations: 300
+val_switch_interval: 100
+verbose: 2
+weights:
+  adj_weight: 1
+  diversity_weight: 200
+  edge_feature_vector_weight: 1.6099602876462376
+  node_feature_vector_binary_cat_weight: 6
+  node_feature_vector_cont_weight: 3
+  node_feature_vector_multi_cat_weight: 6
+  node_feature_vector_weight: 3
+yaml: false
