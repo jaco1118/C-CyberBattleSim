@@ -352,3 +352,76 @@ observations, not as evidence of any N-vs-convergence-difficulty relationship.
 - `cyberbattle/agents/y_n30n60/verdicts/` -- every stage's F4 output, N=30/N=60/N=90 (e621f6c..c455dd9)
 - Topology binaries (234MB, 10 folders) gitignored per repo convention; off-machine backup only.
 - Y-N30-N60/N=90 Part 2 (O8 Arm 4) work continues on `rq2b-10-15`, unrelated to this card's scope.
+
+## STEP 2 -- Task Y-EXTEND: bounded extension beyond the pre-registered 1.25M cap [FINDING]
+
+**This is a disclosed deviation from the 1,250,000-step pre-registered hard cap in section 1.0/1.3
+above.** Motivated by both cells sitting close to the F4 threshold (N=60 mean 4.52%, already under
+5%, only short on the seed-count criterion; N=90 missing by 0.01pp on one seed) and by Y2-pilot's
+own precedent (`evidence_taskY2.md`: N=50 needed 4 unstable stages, peaking at 11.46% error, before
+converging -- a cell can look unlikely to converge and still get there given more steps). Extended
+**both** cells by up to two more 250k stages (new per-seed cap: 1,750,000, up from 1,250,000) using
+the identical F4 rule, stopping each cell/seed at the first stage that converges or at the new cap,
+whichever comes first. Branch: `taskY-probe-n90` (confirmed the same branch holds N=30/N=60/N=90;
+no separate `y_n30n60` branch exists -- that's a directory name, not a branch).
+
+Before training, the GAE encoder integrity was independently re-verified for this task (full detail
+in the session record): `model_spec.yaml`/`train_config_encoder.yaml` are byte-identical (`git diff`
+empty, matching blob SHAs) across their entire commit history back to the original `e237d1e`
+(2026-08-04 17:28); that commit postdates *both* N=60's training (ended 2026-08-04 00:13) and N=90's
+(ended 2026-08-03 13:42) by several hours, so the branch-checkout deletion risk these files are
+occasionally subject to did not exist yet during either cell's original training. The actual frozen
+weights (`encoder.pth`) are `.gitignore`'d, never force-added on any branch, and untouched since
+2024-11-21 -- never at risk from any git operation this project has done.
+
+### 2.1 N=60 extension: stages 6-7, stops at the 1.75M cap, still NOT CONVERGED
+
+All 5 seeds resumed together (group-lockstep, same mechanism as stages 1-5) from their confirmed
+1,250,000-step checkpoints (verified exactly, not assumed: every stage 1-5 checkpoint file for every
+seed reads `checkpoint_250000_steps.zip`, no partial stages).
+
+| stage | absolute step | mean\|Delta%\| | within-band | verdict |
+|---|---|---|---|---|
+| 6 | 1.5M  | 6.76% | 2/5 | NOT CONVERGED (worse than stage 5) |
+| 7 | 1.75M (new cap) | 5.70% | 3/5 | NOT CONVERGED -- stops here per the task's cap |
+
+**Stage 7 (final) per-seed:** seed42 +1.83% YES, seed100 -9.22% no, seed123 -2.17% YES, seed200
+-14.37% no, seed300 -0.92% YES. seed300 flipped into band across the extension; seed100 stayed a
+persistent miss throughout (~6-9% at every extension stage, never closing); seed200 regressed hard
+at stage 6 (-0.58% -> -16.16%) and did not recover. Non-monotonic, consistent with N=60's entire
+history since stage 1. **FINAL: N=60 does not converge even with the extension** -- verdict stands
+at NOT CONVERGED, now at 1.75M instead of 1.25M. Verdicts: `y_n30n60/verdicts/stage{6,7}_N60.txt`
+(commits `57cc3ab`, `9c448f1`).
+
+### 2.2 N=90 extension: one stage, CONVERGED -- only seed100 and seed300 touched
+
+Per STEP 0.3/0.4 of this task, only the two seeds not already within band were extended (seed42,
+123, 200 left untouched at their existing 1.25M/500k/500k checkpoints). seed100 resumed from 1.25M
+-> 1.5M; seed300 resumed from 750k -> 1.0M -- both one 250k stage, well under the 1.75M cap.
+
+| seed | extended? | final step | Delta% | within? |
+|---|---|---|---|---|
+| 42  | no (already in band) | 1.25M | +1.09% | YES |
+| 100 | **yes** | **1.5M** | **-1.25%** | **YES** |
+| 123 | no (already in band) | 500k | -4.10% | YES |
+| 200 | no (already in band) | 500k | +1.28% | YES |
+| 300 | **yes** | **1.0M** | **-3.15%** | **YES** |
+
+mean|Delta%| = 2.18% (<5%), within-band = **5/5** -> **CONVERGED**. Notable reversal worth flagging
+explicitly: seed100 (-13.90% before extension) had been characterized, in this task's own STEP 0
+discussion, as "a genuine outlier rather than a near miss" unlikely to close its gap -- it closed
+completely with a single 250k stage. seed300 (-5.01%, the 0.01pp miss referenced in the dissertation
+text) flipped as expected. Verdict: `y_n90_extend/verdicts/stage1_N90.txt` (commit `57cc3ab`).
+
+### 2.3 Summary of the deviation
+
+Applied identically to both cells (not selectively): cap raised from 1,250,000 to 1,750,000 steps
+per seed, i.e. up to 500,000 additional steps (two 250k stages), same F4 rule throughout, extension
+stopped at the first stage that converges. **Result: N=90 converges at 1.5M (only 250k beyond the
+old cap, for 2 of 5 seeds); N=60 does not converge even at the full 1.75M cap.** Reported here as
+facts for the dissertation write-up to characterize; no conclusion about RQ1(c) is drawn in this
+card, consistent with STEP 1.3's own scope restriction above.
+
+Artifacts: `y_n30n60/run_stage.sh` (reused unmodified, generalizes to any stage number), `y_n90_extend/`
+(new: `run_stage.sh`, `y_base.yaml`, `seeds/`, `verdicts/` -- commit `59372c4`), gae-config restore
+on this branch (`f73481d`).
