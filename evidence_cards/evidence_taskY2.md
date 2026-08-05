@@ -123,11 +123,46 @@ complete, plus the 25k-granularity trail beneath them).
 (mean|Delta%|: 7.09% -> 4.37% -> 11.46%; within-band count: 2/5 -> 3/5 -> 0/5). Two stages remain
 under the pre-agreed hard cap (stage 4 = 1M, stage 5 = 1.25M) if/when authorized to continue.
 
-**Preliminary read against the task's own question** (does lower degree fix Task Y's convergence
-problem?): so far, NO -- this pilot has been LESS stable through 750k than Task Y's own N=60 cell
-was at the equivalent point (N=60's stage 3 verdict, for comparison: NOT CONVERGED, mean 7.61%,
-3/5 within band -- better on both counts than this pilot's stage 3). Preliminary, not final --
-Task Y's N=60 also fluctuated stage to stage before its own final (non-converged, capped) verdict,
-so this pilot's remaining 2 stages could still move either direction. Full comparison against
-Task Y's N=60 cell reserved for the final report once stages 4-5 are run or the pilot is
-otherwise concluded.
+## Stage 4 result (1M) [FINDING] -- CONVERGED, pilot complete, no stage 5 needed
+
+**CONVERGED.** mean|Delta%|=4.22% (<5%), 4/5 within band (need >=4). seed42 -2.83% YES, seed100
+-0.65% YES, seed123 +4.05% YES, seed200 -13.27% no (the only miss), seed300 +0.31% YES. Per the
+pre-registered stopping rule (stop at first stage that converges, matching Task Y's own
+methodology exactly), **N=50 is done at 1M steps -- stage 5 was not launched.** Verdict:
+`y2_n50/verdicts/stage4_N50.txt` (commit `6937979`).
+
+## FINAL: full stage trajectory + comparison against Task Y [FINDING]
+
+| stage | absolute step | mean\|Delta%\| | within-band | verdict |
+|---|---|---|---|---|
+| 1 | 250k | 7.09% | 2/5 | NOT CONVERGED |
+| 2 | 500k | 4.37% | 3/5 | NOT CONVERGED |
+| 3 | 750k | 11.46% | 0/5 | NOT CONVERGED (worst) |
+| 4 | 1M   | 4.22% | 4/5 | **CONVERGED** |
+
+Non-monotonic throughout (matches the volatility pattern Task Y's own N=60 showed across its 5
+stages) -- got markedly worse at stage 3 before recovering cleanly at stage 4. **1M total training
+steps used** (4 x 250k), vs Task Y's N=30 (250k, converged immediately) and N=60 (1.25M, hit the
+cap without ever converging).
+
+**STEP 5 -- direct comparison against Task Y's own N=60 cell** (same criterion, different degree):
+
+| | Y2-pilot N=50 (degree ~12.5) | Task Y N=60 (degree ~19.9) |
+|---|---|---|
+| verdict | **CONVERGED** (1M) | **NOT CONVERGED** (hit 1.25M cap) |
+| training used | 1M | 1.25M (hit hard cap) |
+| trajectory | 7.09% -> 4.37% -> 11.46% -> 4.22% (converged) | 6.97% -> 6.55% -> 7.61% -> 8.62% -> 4.52% (closest at the very end, still failed on count) |
+
+**One-sentence answer to what this pilot exists to test:** this result SUPPORTS the degree
+hypothesis -- N=50 at a much lower fixed degree (~12.5 vs Task Y's ~20) reached a clean CONVERGED
+verdict within budget, something neither N=60 nor N=90 (both at degree ~20) achieved even after
+using their full training budgets (1.25M and a mixed 4.75M respectively), though it took 4x longer
+than Task Y's own N=30 cell (also degree ~20) and passed through a notably volatile middle stretch
+before landing.
+
+## STEP 6 -- recommendation gate [not an autonomous decision -- waiting for authorization]
+
+**Per the task's own instruction: this pilot CONVERGED cleanly, so the recommendation is to
+proceed to build the other three cells (N=20, N=30, N=40) at the same degree (~10-12.5 target).**
+This is a recommendation, not an action taken -- no further cells have been generated or trained,
+and none will be without explicit authorization.
