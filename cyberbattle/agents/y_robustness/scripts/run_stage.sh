@@ -18,8 +18,8 @@ RUN[n30_200]=logs/yN30_s200_stg1_2026-08-03_21-28-47/TRPO_x_control_SecureBERT; 
 RUN[n30_300]=logs/yN30_s300_stg1_2026-08-03_21-28-47/TRPO_x_control_SecureBERT; CS[n30_300]=250000; TOPO[n30_300]="./graphs_yN30_s300_2026-08-03_17-15-34/1"
 RUN[n90_42]=logs/yprobe_n90_s42_ext125M_2026-08-03_13-42-07/TRPO_x_control_SecureBERT;  CS[n90_42]=500000;  TOPO[n90_42]="./graphs_yprobe_n90_2026-08-03_02-10-10/1"
 RUN[n90_100]=logs/yN90ext_s100_stg1_2026-08-05_22-55-50/TRPO_x_control_SecureBERT;       CS[n90_100]=250000; TOPO[n90_100]="./graphs_yprobe_n90_s100_2026-08-03_08-38-04/1"
-RUN[n90_123]=logs/yprobe_n90_s123_static500k_2026-08-03_08-43-27/TRPO_x_control_SecureBERT; CS[n90_123]=500000; TOPO[n90_123]="./graphs_yprobe_n90_s123_2026-08-03_08-43-27/1"
-RUN[n90_200]=logs/yprobe_n90_s200_static500k_2026-08-03_08-43-27/TRPO_x_control_SecureBERT; CS[n90_200]=500000; TOPO[n90_200]="./graphs_yprobe_n90_s200_2026-08-03_08-43-27/1"
+RUN[n90_123]=logs/yprobe_n90_s123_static500k_2026-08-03_08-43-27/TRPO_x_control_SecureBERT; CS[n90_123]=500000; TOPO[n90_123]="./graphs_yprobe_n90_s123_2026-08-03_08-38-04/1"
+RUN[n90_200]=logs/yprobe_n90_s200_static500k_2026-08-03_08-43-27/TRPO_x_control_SecureBERT; CS[n90_200]=500000; TOPO[n90_200]="./graphs_yprobe_n90_s200_2026-08-03_08-38-04/1"
 RUN[n90_300]=logs/yN90ext_s300_stg1_2026-08-05_22-55-50/TRPO_x_control_SecureBERT;       CS[n90_300]=250000; TOPO[n90_300]="./graphs_yprobe_n90_s300_2026-08-03_08-38-04/1"
 
 pids=()
