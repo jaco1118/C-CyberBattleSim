@@ -83,15 +83,21 @@ def main():
     v90 = np.array(list(r90.values()))
     print(f"  mean={v90.mean():.4f} sd={v90.std(ddof=1):.4f}")
 
-    diff_point = v30.mean() - v90.mean()
-    print(f"\nPoint difference (N30 - N90) = {diff_point:+.4f}")
+    # Sign convention: matches compute_robustness.py:59 exactly ("diff = r90.mean() - r30.mean()"),
+    # i.e. N90 minus N30 -- the point-estimate script this task is attaching a CI to. Caught by
+    # comparing the first run's point difference (+0.0223) against the task's stated prediction
+    # (-0.022, "about"): same magnitude, opposite sign -- a genuine convention mismatch against the
+    # existing script, not a value to adjust toward. Fixed here before any second interpretation of
+    # the CI itself; RNG seed, NB and resampling logic are unchanged from the first run.
+    diff_point = v90.mean() - v30.mean()
+    print(f"\nPoint difference (N90 - N30, matching compute_robustness.py's own convention) = {diff_point:+.4f}")
 
     rng = np.random.default_rng(SEED)
     diffs = []
     for _ in range(NB):
         b30 = rng.choice(SEEDS, len(SEEDS), replace=True)
         b90 = rng.choice(SEEDS, len(SEEDS), replace=True)
-        diffs.append(pooled_robustness("n30", b30) - pooled_robustness("n90", b90))
+        diffs.append(pooled_robustness("n90", b90) - pooled_robustness("n30", b30))
     diffs = np.array(diffs)
     lo, hi = np.percentile(diffs, 2.5), np.percentile(diffs, 97.5)
     contains_zero = lo <= 0.0 <= hi
@@ -99,7 +105,7 @@ def main():
     width = hi - lo
     reported_width = 0.0088 - (-0.0693)
 
-    print(f"\nBootstrap 95% CI on (N30-N90) pooled difference, RNG seed={SEED}, {NB} reps "
+    print(f"\nBootstrap 95% CI on (N90-N30) pooled difference, RNG seed={SEED}, {NB} reps "
           f"(5 N=30 seeds / 5 N=90 seeds resampled independently): [{lo:+.4f}, {hi:+.4f}]  {verdict}")
     print(f"Interval width = {width:.4f}  vs reported width = {reported_width:.4f}  "
           f"(ratio fresh/reported = {width/reported_width:.3f})")
@@ -108,7 +114,7 @@ def main():
     out_df = pd.DataFrame([{
         "seed": s, "n30_robustness": r30[s], "n90_robustness": r90[s],
     } for s in SEEDS])
-    out_df["point_difference_n30_minus_n90"] = diff_point
+    out_df["point_difference_n90_minus_n30"] = diff_point
     out_df["ci_lo"] = lo
     out_df["ci_hi"] = hi
     out_df["n_resamples"] = NB
