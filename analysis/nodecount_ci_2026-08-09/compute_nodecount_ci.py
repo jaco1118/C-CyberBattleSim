@@ -31,18 +31,34 @@ def load(cell, s, cond):
     return pd.read_csv(f"y_robustness/out/{cell}/score_static_seed{s}_eval{cond}.csv")["root_owned"].to_numpy()
 
 
+# PERFORMANCE NOTE (not a methodology change): compute_neighbour_comparison.py's pooled_robustness
+# re-reads each seed's CSV from disk on every call, which is fine at NB=10,000 for its own cell
+# pair but timed out here after 2 minutes on n30/n90 (identical file sizes, just more redundant
+# I/O across the run). Preloading each seed's static/change arrays ONCE below and resampling the
+# in-memory arrays is mathematically identical -- same files, same values, same resampling logic,
+# same RNG seed, same NB -- it only removes repeated disk reads of the exact same content.
+_CACHE = {}
+
+
+def _get(cell, s, cond):
+    key = (cell, s, cond)
+    if key not in _CACHE:
+        _CACHE[key] = load(cell, s, cond)
+    return _CACHE[key]
+
+
 def per_seed_robustness(cell, seeds):
     out = {}
     for s in seeds:
-        st = load(cell, s, "static")
-        ch = load(cell, s, "membership_matched")
+        st = _get(cell, s, "static")
+        ch = _get(cell, s, "membership_matched")
         out[s] = ch.mean() / st.mean()
     return out
 
 
 def pooled_robustness(cell, seeds):
-    st = np.concatenate([load(cell, s, "static") for s in seeds])
-    ch = np.concatenate([load(cell, s, "membership_matched") for s in seeds])
+    st = np.concatenate([_get(cell, s, "static") for s in seeds])
+    ch = np.concatenate([_get(cell, s, "membership_matched") for s in seeds])
     return ch.mean() / st.mean()
 
 
