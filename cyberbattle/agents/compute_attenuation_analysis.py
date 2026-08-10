@@ -190,6 +190,8 @@ def build_band_envs(train_config, graph_encoder, topology_source_folder, n_topol
             drift_run_id=f"{band_label}_seed{seed}", drift_seed=seed, drift_scenario_id=folder,
             event_graph_logging=(os.environ.get("YEG") == "1"),  # Task-L STEP3 (gated; unique dir per env avoids float-store offset collisions)
             event_graph_log_dir=(os.path.join(DRIFT_LOG_DIR, f"eventgraph_{band_label}", f"s{seed}_{folder}") if os.environ.get("YEG") == "1" else None),
+            leave_embedding_logging=(os.environ.get("LEG") == "1"),  # Task GRAPH-DEPTH STEP3 (gated; same pattern as YEG; unique dir per env)
+            leave_embedding_log_dir=(os.path.join(DRIFT_LOG_DIR, f"leaveembed_{band_label}", f"s{seed}_{folder}") if os.environ.get("LEG") == "1" else None),
             **{k: v for k, v in train_config_for_env.items()
                if k not in ('drift_logging', 'drift_log_path', 'drift_sample_rate',
                              'drift_run_id', 'drift_seed', 'drift_scenario_id')}
