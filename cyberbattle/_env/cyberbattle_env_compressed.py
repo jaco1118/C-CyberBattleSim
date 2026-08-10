@@ -109,6 +109,11 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                  # --- Task L: event-graph side logging (append-only, independent of the drift CSV) ---
                  event_graph_logging=False, # enable the Task-L side logger (edges/obs/action-keys/identity per change-step); only active when drift_logging is also True
                  event_graph_log_dir=None,  # directory for the side files; None -> "<drift_log_path without .csv>_eventgraph/"
+                 # --- Task GRAPH-DEPTH: per-leave-event real-graph embedding side logging (append-only,
+                 # independent of the drift CSV and of the Task L side logger -- its own flag, combined
+                 # with drift_logging the same way event_graph_logging is, per that flag's own pattern). ---
+                 leave_embedding_logging=False, # log h[v] + 2-hop pre/post embeddings + survivor counts at each membership_leave event; only active when drift_logging is also True
+                 leave_embedding_log_dir=None,  # directory for the side files; None -> "<drift_log_path without .csv>_leaveembed/"
                  **kwargs
                  ):
         super().__init__(**kwargs)
@@ -197,6 +202,18 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 _base = drift_log_path[:-4] if (drift_log_path and drift_log_path.endswith(".csv")) else (drift_log_path or "drift")
                 _egd = _base + "_eventgraph"
             self._event_graph_logger = EventGraphLogger(_egd)
+        # --- Task GRAPH-DEPTH side logger: independent flag, independent file, independent of
+        # event_graph_logging. Lazily opens its own JSONL file on first write (same pattern as
+        # _cx_replay_probe), never touches the drift CSV, env state, or the RNG. ---
+        self.leave_embedding_logging = bool(leave_embedding_logging) and bool(self.drift_logging)
+        self._leave_embedding_log_dir = leave_embedding_log_dir
+        if self.leave_embedding_logging and self._leave_embedding_log_dir is None:
+            # Resolved once here (drift_log_path is only an __init__-local parameter, not a self
+            # attribute) -- same default-naming convention as event_graph_log_dir above.
+            _base = drift_log_path[:-4] if (drift_log_path and drift_log_path.endswith(".csv")) else (drift_log_path or "drift")
+            self._leave_embedding_log_dir = _base + "_leaveembed"
+        self._leave_embed_f = None
+        self._LE_pre = None  # per-step pre-change edge-list capture bundle (Task GRAPH-DEPTH), reset each step
         self._L_pre = None  # per-step pre-change capture bundle (Task L), reset each step
         self._episode_count = -1  # incremented to 0 on the first reset()
         self._last_connectivity_event = None  # set by add_edge_evolving_visible_graph, consumed/reset once per step
@@ -679,6 +696,14 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 "distinct_max_holders": d_max,
                 "distinct_min_holders": d_min,
             }
+        # --- Task GRAPH-DEPTH pre-change capture (read-only, independent of event_graph_logging):
+        # the pre-mutation edge list is the only thing needed here beyond what h2's own
+        # node_embeddings dict already carries -- everything else (h[v], h[n] for survivors, N)
+        # comes straight from drift_h2 below, no re-encode. Pure read + list copy; no RNG draw,
+        # no state mutation. ---
+        self._LE_pre = None
+        if self.leave_embedding_logging and log_this_step:
+            self._LE_pre = {"edges": list(self.evolving_visible_graph.edges())}
         # Task CX replay probe (gated; read-only): pre-change per-node embeddings + node vuln/service state.
         _rp_pre = None
         if os.environ.get("CX_REPLAY_PROBE") == "1":
@@ -780,6 +805,11 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                     self._cx_ep_event_counts[ct] = self._cx_ep_event_counts.get(ct, 0) + 1
                     if ct == "membership_leave":
                         self._cx_ep_root_departures += sum(1 for nid in e["node_ids"] if nid in self._L_pre["root"])
+            # Task GRAPH-DEPTH: independent of event_graph_logging, gated on its own flag only.
+            # Uses drift_h2/drift_h3 (already computed above for the drift CSV) directly -- no
+            # extra encode() call, no RNG exposure.
+            if self.leave_embedding_logging and dynamic_events:
+                self._log_leave_embeddings(drift_h2, drift_h3, dynamic_events)
             self._drift_prev_step_removed_ids = [
                 node_id for event in dynamic_events if event["change_type"] == "membership_leave"
                 for node_id in event["node_ids"]
@@ -1210,6 +1240,57 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
                 norm_h1_slices=norm_h1_slices, norm_h2_slices=norm_h2_slices,
             )
             self._drift_logger.log(row)
+
+    # Task GRAPH-DEPTH: per-membership_leave-event real-graph embedding log. Logs the embeddings
+    # the environment ALREADY computed (h2's node_embeddings = probe_p.py's h, h3's = its hp) --
+    # no re-encode, no new encoder() call, no RNG exposure. One record per departing node (a
+    # multi-node batch event gets one record per node it touched, each carrying that node's own
+    # h[v] and its own 2-hop neighbourhood). Two counts are logged per Section A's correction:
+    # total_survivors = len(hp), the ALL-survivor count PROPAGATION's mean(0) actually divides by
+    # in probe_p.py:101; two_hop_survivors = how many of the LOGGED (2-hop-restricted) nodes
+    # actually survived -- kept distinct so neither is silently used in place of the other
+    # downstream. Read-only; no state mutation.
+    def _log_leave_embeddings(self, drift_h2, drift_h3, dynamic_events):
+        import json
+        if self._leave_embed_f is None:
+            os.makedirs(self._leave_embedding_log_dir, exist_ok=True)
+            self._leave_embed_f = open(
+                os.path.join(self._leave_embedding_log_dir, f"leaveembed_{self.drift_run_id}_{self.drift_scenario_id}.jsonl"), "a")
+
+        h = drift_h2.node_embeddings   # h2 = pre-change: probe_p.py's h
+        hp = drift_h3.node_embeddings  # h3 = post-change: probe_p.py's hp
+        N = len(h)
+        total_survivors = len(hp)  # Section A: the ALL-survivor count, not the 2-hop-restricted one
+
+        # Undirected graph over every pre-removal node (including isolated ones, which the edge
+        # list alone would miss), matching probe_p.py's own Gu = G.to_undirected() convention.
+        Gu = nx.Graph()
+        Gu.add_nodes_from(h.keys())
+        if self._LE_pre is not None:
+            Gu.add_edges_from(self._LE_pre["edges"])
+
+        for i, event in enumerate(dynamic_events):
+            if event["change_type"] != "membership_leave":
+                continue
+            n_touched = len(event["node_ids"])
+            for v in event["node_ids"]:
+                if v not in h:
+                    continue  # should not occur for a leave event's own departing node; guard, not assumed
+                hops = nx.single_source_shortest_path_length(Gu, v, cutoff=2) if v in Gu else {}
+                two_hop_nodes = [n for n, dist in hops.items() if 0 < dist <= 2]
+                pre_embeddings = {str(n): [float(x) for x in h[n]] for n in two_hop_nodes if n in h}
+                post_embeddings = {str(n): [float(x) for x in hp[n]] for n in two_hop_nodes if n in hp}
+                two_hop_survivors = sum(1 for n in two_hop_nodes if n in hp)
+                rec = {
+                    "run_id": self.drift_run_id, "seed": self.drift_seed, "scenario_id": self.drift_scenario_id,
+                    "episode": self._episode_count, "step": self.stepcount, "event_index": i,
+                    "departing_node": str(v), "n_touched_nodes": n_touched,
+                    "h_v": [float(x) for x in h[v]],
+                    "pre_embeddings": pre_embeddings, "post_embeddings": post_embeddings,
+                    "N": N, "total_survivors": total_survivors, "two_hop_survivors": two_hop_survivors,
+                }
+                self._leave_embed_f.write(json.dumps(rec) + "\n")
+        self._leave_embed_f.flush()
 
     # Function determining if a certain outcome changes the evolving visible graph
     def action_changes_evolving_visible_graph(self, outcome):
