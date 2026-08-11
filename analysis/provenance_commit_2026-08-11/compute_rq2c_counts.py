@@ -43,15 +43,29 @@ def batch_counts(band):
 def episode_cluster_counts(band):
     # `_seed` (STEP 0 note): not a JSONL field -- parsed from the filename, matching the loader
     # convention already established for this dataset (rq2c_<band>_seed<seed>_<scenario>.jsonl).
+    #
+    # KEY BUG, found and fixed before this script's results were reported (not silently): the first
+    # version of this function keyed episode_keys on (seed, scenario, episode) -- a 3-tuple -- which
+    # gave 730/148/208, roughly 4x the target 173/49/66. The actual producing code
+    # (compute_rq2c_action_divergence.py:154) keys its own `episode_changed` dict on
+    # (seed, episode) ONLY -- a 2-tuple, with NO scenario component:
+    #   s["episode_changed"][(r["_seed"], r["episode"])].append(ch)
+    # Episode numbering restarts from 0 within each (seed, scenario) run, so this 2-tuple key
+    # deliberately (or not -- the code does not say) collapses episodes across DIFFERENT
+    # topologies that happen to share the same seed and episode number into ONE cluster. This is
+    # reported as a real property of the bootstrap's own clustering unit, not smoothed over: BOTH
+    # the buggy 3-tuple count and the corrected 2-tuple count are computed and reported below, so
+    # the divergence itself is on the record.
     files = sorted(glob.glob(os.path.join(JSONL_DIR, f"rq2c_{band}_seed*_*.jsonl")))
-    episode_keys = set()
+    episode_keys_2tuple = set()   # (seed, episode) -- matches the actual code exactly
+    episode_keys_3tuple = set()   # (seed, scenario, episode) -- the bug, kept for the record
     n_group_ii = 0
     n_group_i = 0
     files_zero_contrib = []
     for f in files:
         m = re.match(rf".*rq2c_{re.escape(band)}_seed(\d+)_", f)
         seed = int(m.group(1))
-        n_before = len(episode_keys)
+        n_before = len(episode_keys_2tuple)
         with open(f) as fh:
             for line in fh:
                 line = line.strip()
@@ -66,10 +80,12 @@ def episode_cluster_counts(band):
                 elif grp == "ii":
                     n_group_ii += 1
                     # `scenario` (STEP 0 note): the record's own field name, not `scenario_id`.
-                    episode_keys.add((seed, r["scenario"], r["episode"]))
-        if len(episode_keys) == n_before:
+                    episode_keys_2tuple.add((seed, r["episode"]))
+                    episode_keys_3tuple.add((seed, r["scenario"], r["episode"]))
+        if len(episode_keys_2tuple) == n_before:
             files_zero_contrib.append(os.path.basename(f))
-    return len(files), len(episode_keys), n_group_ii, n_group_i, files_zero_contrib
+    return (len(files), len(episode_keys_2tuple), len(episode_keys_3tuple),
+            n_group_ii, n_group_i, files_zero_contrib)
 
 
 def main():
@@ -77,7 +93,7 @@ def main():
     rows = []
     for band in BANDS:
         total, single, batch = batch_counts(band)
-        n_files, n_clusters, n_group_ii, n_group_i, zero_files = episode_cluster_counts(band)
+        n_files, n_clusters_2tuple, n_clusters_3tuple, n_group_ii, n_group_i, zero_files = episode_cluster_counts(band)
 
         print(f"--- band {band} ---")
         print(f"  drift CSV: total membership_leave={total}  single-node(n_touched==1)={single}  "
@@ -87,9 +103,11 @@ def main():
               f"target batch={TARGETS['batch'][band]} (diff {batch-TARGETS['batch'][band]:+d})")
         print(f"  JSONL source: {n_files} files contributing, {len(zero_files)} contribute zero group-ii episodes"
               + (f" ({zero_files})" if zero_files else ""))
-        print(f"  group_i={n_group_i}  group_ii={n_group_ii}  distinct episode clusters (>=1 group-ii event)={n_clusters}")
-        print(f"  target episode_clusters={TARGETS['episode_clusters'][band]} "
-              f"(diff {n_clusters-TARGETS['episode_clusters'][band]:+d})")
+        print(f"  group_i={n_group_i}  group_ii={n_group_ii}")
+        print(f"  episode clusters, (seed,episode) 2-tuple [MATCHES the actual code exactly]: {n_clusters_2tuple}  "
+              f"target={TARGETS['episode_clusters'][band]}  diff={n_clusters_2tuple-TARGETS['episode_clusters'][band]:+d}")
+        print(f"  episode clusters, (seed,scenario,episode) 3-tuple [does NOT match the code -- kept for the record]: "
+              f"{n_clusters_3tuple}  diff vs target={n_clusters_3tuple-TARGETS['episode_clusters'][band]:+d}")
         print()
 
         rows.append(dict(
@@ -99,7 +117,9 @@ def main():
             target_batch=TARGETS["batch"][band],
             n_jsonl_files=n_files, n_jsonl_files_zero_contribution=len(zero_files),
             n_group_i=n_group_i, n_group_ii=n_group_ii,
-            episode_clusters=n_clusters, target_episode_clusters=TARGETS["episode_clusters"][band],
+            episode_clusters_2tuple_seed_episode=n_clusters_2tuple,
+            episode_clusters_3tuple_seed_scenario_episode=n_clusters_3tuple,
+            target_episode_clusters=TARGETS["episode_clusters"][band],
         ))
 
     pd.DataFrame(rows).to_csv(os.path.join(OUT_DIR, "item2_rq2c_counts.csv"), index=False)
