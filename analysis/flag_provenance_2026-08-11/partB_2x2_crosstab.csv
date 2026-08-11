@@ -1,0 +1,4 @@
+band,degree0_present,degree0_absent,degree_gt0_present,degree_gt0_absent,no_degree_computed_absent,drift_total,drift_visible,drift_not_visible
+10-15,617,0,744,0,0,1361,1361,0
+30-40,762,0,746,0,0,1508,1508,0
+80-100,2196,0,623,0,0,2819,2819,0

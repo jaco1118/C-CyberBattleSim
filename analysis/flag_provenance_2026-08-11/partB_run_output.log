@@ -1,0 +1,54 @@
+=== PART B: does allow_undiscovered_removal explain the zero-degree finding? ===
+
+--- band 10-15 ---
+  drift CSV (independent, complete): single-node membership_leave rows=1361, touched_node_visible=True: 1361, =False: 0, null: 0
+  leaveembed log (post-guard): total logged=1361 (matches drift-CSV visible count: True)
+  events silently dropped by the 'if v not in h: continue' guard (= drift total - leaveembed logged): 0
+
+  2x2 (rows=degree, columns=presence in pre-change embedding dict), band 10-15:
+                    present        absent
+    degree==0              617              0   (absent+degree-defined is structurally impossible)
+    degree>0               744              0
+    NO DEGREE (event dropped before degree was ever computed): 0
+    row totals: present=1361  absent-with-no-degree=0  grand total (all single-node leaves)=1361
+
+  B3: of the 617 zero-degree events, fraction with departing node ABSENT from the encoder's graph = 0 / 617 = 0.0000 (exactly zero, by construction of the logging guard -- NOT because no absent-node departures exist in this sweep, but because none occurred: n_absent=0 for this band, independently confirmed from the drift CSV, not inferred)
+
+  B4: propagation/direct median, present-AND-degree>0 (n=744): 0.7436  vs published degree>0 figure 0.744  (diff -0.0004)
+      all-events median (n=1361): 0.0000  vs published all-events figure 0.0
+
+--- band 30-40 ---
+  drift CSV (independent, complete): single-node membership_leave rows=1508, touched_node_visible=True: 1508, =False: 0, null: 0
+  leaveembed log (post-guard): total logged=1508 (matches drift-CSV visible count: True)
+  events silently dropped by the 'if v not in h: continue' guard (= drift total - leaveembed logged): 0
+
+  2x2 (rows=degree, columns=presence in pre-change embedding dict), band 30-40:
+                    present        absent
+    degree==0              762              0   (absent+degree-defined is structurally impossible)
+    degree>0               746              0
+    NO DEGREE (event dropped before degree was ever computed): 0
+    row totals: present=1508  absent-with-no-degree=0  grand total (all single-node leaves)=1508
+
+  B3: of the 762 zero-degree events, fraction with departing node ABSENT from the encoder's graph = 0 / 762 = 0.0000 (exactly zero, by construction of the logging guard -- NOT because no absent-node departures exist in this sweep, but because none occurred: n_absent=0 for this band, independently confirmed from the drift CSV, not inferred)
+
+  B4: propagation/direct median, present-AND-degree>0 (n=746): 1.3575  vs published degree>0 figure 1.358  (diff -0.0005)
+      all-events median (n=1508): 0.0000  vs published all-events figure 0.0
+
+--- band 80-100 ---
+  drift CSV (independent, complete): single-node membership_leave rows=2819, touched_node_visible=True: 2819, =False: 0, null: 0
+  leaveembed log (post-guard): total logged=2819 (matches drift-CSV visible count: True)
+  events silently dropped by the 'if v not in h: continue' guard (= drift total - leaveembed logged): 0
+
+  2x2 (rows=degree, columns=presence in pre-change embedding dict), band 80-100:
+                    present        absent
+    degree==0             2196              0   (absent+degree-defined is structurally impossible)
+    degree>0               623              0
+    NO DEGREE (event dropped before degree was ever computed): 0
+    row totals: present=2819  absent-with-no-degree=0  grand total (all single-node leaves)=2819
+
+  B3: of the 2196 zero-degree events, fraction with departing node ABSENT from the encoder's graph = 0 / 2196 = 0.0000 (exactly zero, by construction of the logging guard -- NOT because no absent-node departures exist in this sweep, but because none occurred: n_absent=0 for this band, independently confirmed from the drift CSV, not inferred)
+
+  B4: propagation/direct median, present-AND-degree>0 (n=623): 1.2654  vs published degree>0 figure 1.265  (diff +0.0004)
+      all-events median (n=2819): 0.0000  vs published all-events figure 0.0
+
+Done.

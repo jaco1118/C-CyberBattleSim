@@ -1,0 +1,4 @@
+band,n_restricted,median_present_and_degree_gt0,published_degree_gt0,n_all,median_all_events,published_all_events
+10-15,744,0.7436273148053766,0.744,1361,0.0,0.0
+30-40,746,1.3574553724588851,1.358,1508,0.0,0.0
+80-100,623,1.2654099725246268,1.265,2819,0.0,0.0
