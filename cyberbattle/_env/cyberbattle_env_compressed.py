@@ -1241,15 +1241,22 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             )
             self._drift_logger.log(row)
 
-    # Task GRAPH-DEPTH: per-membership_leave-event real-graph embedding log. Logs the embeddings
-    # the environment ALREADY computed (h2's node_embeddings = probe_p.py's h, h3's = its hp) --
-    # no re-encode, no new encoder() call, no RNG exposure. One record per departing node (a
-    # multi-node batch event gets one record per node it touched, each carrying that node's own
-    # h[v] and its own 2-hop neighbourhood). Two counts are logged per Section A's correction:
-    # total_survivors = len(hp), the ALL-survivor count PROPAGATION's mean(0) actually divides by
-    # in probe_p.py:101; two_hop_survivors = how many of the LOGGED (2-hop-restricted) nodes
-    # actually survived -- kept distinct so neither is silently used in place of the other
-    # downstream. Read-only; no state mutation.
+    # Task GRAPH-DEPTH (widened, GRAPH-DEPTH-WIDE): per-membership_leave-event real-graph embedding
+    # log. Logs the embeddings the environment ALREADY computed (h2's node_embeddings = probe_p.py's
+    # h, h3's = its hp) -- no re-encode, no new encoder() call, no RNG exposure. One record per
+    # departing node (a multi-node batch event gets one record per node it touched, each carrying
+    # that node's own h[v]). SUPERSEDES the original 2-hop-restricted version: pre_embeddings/
+    # post_embeddings now carry EVERY present node's embedding (all of h minus v, all of hp), not
+    # only the 2-hop subset -- the GRAPH-DEPTH follow-up established the 2-hop gate was selecting
+    # the smallest graphs in each band rather than sampling them (evidence: included-vs-excluded
+    # median N gap widening from 5-vs-7 at band 10-15 to 2.5-vs-71 at band 80-100), so widening
+    # removes the reason for that gate to exist. total_survivors = len(hp), the ALL-survivor count
+    # PROPAGATION's mean(0) actually divides by (probe_p.py:101); hop_distance and
+    # departing_node_degree are lightweight scalar/dict metadata (not raw structure for re-encoding,
+    # consistent with the Section B reproduction-risk constraint) added so depth/degree distribution
+    # can be reported downstream without needing the edge list; two_hop_survivors is retained,
+    # unchanged in meaning, as a metadata subset count only -- it no longer gates which nodes get
+    # logged. Read-only; no state mutation.
     def _log_leave_embeddings(self, drift_h2, drift_h3, dynamic_events):
         import json
         if self._leave_embed_f is None:
@@ -1263,7 +1270,9 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
         total_survivors = len(hp)  # Section A: the ALL-survivor count, not the 2-hop-restricted one
 
         # Undirected graph over every pre-removal node (including isolated ones, which the edge
-        # list alone would miss), matching probe_p.py's own Gu = G.to_undirected() convention.
+        # list alone would miss), matching probe_p.py's own Gu = G.to_undirected() convention. Kept
+        # for hop-distance/degree METADATA only (STEP 4.7's depth/degree distribution ask); no
+        # longer used to restrict which nodes' embeddings are logged.
         Gu = nx.Graph()
         Gu.add_nodes_from(h.keys())
         if self._LE_pre is not None:
@@ -1276,17 +1285,19 @@ class CyberBattleCompressedEnv(CyberBattleEnv):
             for v in event["node_ids"]:
                 if v not in h:
                     continue  # should not occur for a leave event's own departing node; guard, not assumed
-                hops = nx.single_source_shortest_path_length(Gu, v, cutoff=2) if v in Gu else {}
-                two_hop_nodes = [n for n, dist in hops.items() if 0 < dist <= 2]
-                pre_embeddings = {str(n): [float(x) for x in h[n]] for n in two_hop_nodes if n in h}
-                post_embeddings = {str(n): [float(x) for x in hp[n]] for n in two_hop_nodes if n in hp}
-                two_hop_survivors = sum(1 for n in two_hop_nodes if n in hp)
+                pre_embeddings = {str(n): [float(x) for x in emb] for n, emb in h.items() if n != v}
+                post_embeddings = {str(n): [float(x) for x in emb] for n, emb in hp.items()}
+                hops_raw = nx.single_source_shortest_path_length(Gu, v) if v in Gu else {}  # no cutoff: full depth
+                hop_distance = {str(n): d for n, d in hops_raw.items() if d > 0}
+                departing_node_degree = Gu.degree(v) if v in Gu else 0
+                two_hop_survivors = sum(1 for n, d in hops_raw.items() if 0 < d <= 2 and n in hp)
                 rec = {
                     "run_id": self.drift_run_id, "seed": self.drift_seed, "scenario_id": self.drift_scenario_id,
                     "episode": self._episode_count, "step": self.stepcount, "event_index": i,
                     "departing_node": str(v), "n_touched_nodes": n_touched,
                     "h_v": [float(x) for x in h[v]],
                     "pre_embeddings": pre_embeddings, "post_embeddings": post_embeddings,
+                    "hop_distance": hop_distance, "departing_node_degree": departing_node_degree,
                     "N": N, "total_survivors": total_survivors, "two_hop_survivors": two_hop_survivors,
                 }
                 self._leave_embed_f.write(json.dumps(rec) + "\n")
