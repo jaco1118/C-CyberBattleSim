@@ -1,0 +1,24 @@
+=== VISIBILITY-PUZZLE: volume + visibility rate, both sweeps, all bands ===
+
+  10-15    graphdepth_sweep_wide    n_leave=   1399  visible=   1399 (100.0%)
+  10-15    cx_step2_registration    n_leave=  12012  visible=   2131 (17.7%)
+  30-40    graphdepth_sweep_wide    n_leave=   1672  visible=   1672 (100.0%)
+  30-40    cx_step2_registration    n_leave=  49295  visible=   6479 (13.1%)
+  80-100   graphdepth_sweep_wide    n_leave=   3127  visible=   3127 (100.0%)
+  80-100   cx_step2_registration    n_leave=  56035  visible=  10174 (18.2%)
+
+=== volume ratio, cx_step2_registration / graphdepth_sweep_wide ===
+  10-15    ratio=8.59x  (12012 / 1399)
+  30-40    ratio=29.48x  (49295 / 1672)
+  80-100   ratio=17.92x  (56035 / 3127)
+
+=== checkpoint's own frozen train_config.yaml: patch_service_dynamic_enabled, allow_undiscovered_removal presence ===
+  band 10-15: patch_service_dynamic_enabled=False  allow_undiscovered_removal key present=False
+
+=== launch-command env vars actually used (recovered from session transcripts, quoted verbatim in this script's own docstring; not re-derivable from disk alone) ===
+  graphdepth_sweep_wide : RQ2C=1 LEG=1 (no CX_DIAG)
+  cx_step2_registration : CX_DIAG=1 (registration arm: removal+join+patch relaxed)
+  rq2c_replay           : RQ2C=1 (no CX_DIAG) -- same mismatch pattern, flagged only
+  cx_step2_replay       : CX_DIAG=1 CX_REPLAY=1 (matches its own metadata)
+
+Done.
