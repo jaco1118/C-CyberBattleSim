@@ -1,0 +1,4 @@
+band,n_registration_episodes,n_no_static_pair,n_no_structure_events,n_event_graph_events_total,n_event_graph_events_discovered1,n_drift_immediate_rows,n_zero_attenuation,n_zero_attenuation_nonzero_dhv
+10-15,640,0,0,20837,9236,9127,14,0
+30-40,1770,0,0,78734,32426,31964,330,0
+80-100,2000,0,0,93078,40225,39527,130,0

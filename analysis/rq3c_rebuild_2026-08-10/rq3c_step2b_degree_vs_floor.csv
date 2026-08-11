@@ -1,0 +1,13 @@
+quantity,band,value,n
+R2 of degree alone,pooled,0.0015805812018269139,4410
+R2 of degree alone,10-15,0.023779738426125574,640
+R2 of degree alone,30-40,0.12724627614930484,1770
+R2 of degree alone,80-100,0.027109443261365107,2000
+detectable R2 floor STRUCTURE (k=3),pooled,0.0024683223819573006,4410
+detectable R2 floor STRUCTURE (k=3),10-15,0.01685142427650364,640
+detectable R2 floor STRUCTURE (k=3),30-40,0.0061354094655944975,1770
+detectable R2 floor STRUCTURE (k=3),80-100,0.005432293361518741,2000
+detectable R2 floor single predictor (k=1),pooled,0.001777398031809162,4410
+detectable R2 floor single predictor (k=1),10-15,0.012151397384969669,640
+detectable R2 floor single predictor (k=1),30-40,0.0044195873800094935,1770
+detectable R2 floor single predictor (k=1),80-100,0.003912835896387613,2000

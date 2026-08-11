@@ -1,0 +1,88 @@
+[10-15] assembled 640 episodes (registration=640, no_static_pair=0, no_structure_events=0)
+        event_graph: total_events=20837 discovered1=9236
+        drift 'immediate' rows=9127 zero_attenuation=14 (of which delta_h_v_norm also nonzero: 0)
+[30-40] assembled 1770 episodes (registration=1770, no_static_pair=0, no_structure_events=0)
+        event_graph: total_events=78734 discovered1=32426
+        drift 'immediate' rows=31964 zero_attenuation=330 (of which delta_h_v_norm also nonzero: 0)
+[80-100] assembled 2000 episodes (registration=2000, no_static_pair=0, no_structure_events=0)
+        event_graph: total_events=93078 discovered1=40225
+        drift 'immediate' rows=39527 zero_attenuation=130 (of which delta_h_v_norm also nonzero: 0)
+
+pooled n=4410
+
+======================================================================
+STEP 1 -- reproduction of the recovered table
+======================================================================
+STRUCTURE (deg+2hop+prop): pooled R2=0.1604 (n=4410)  10-15=0.1190(n=640)  30-40=0.4453(n=1770)  80-100=0.3856(n=2000)
+TYPE (property_fraction): pooled R2=0.0113 (n=4410)  10-15=0.0028(n=640)  30-40=0.0327(n=1770)  80-100=0.0035(n=2000)
+
+Reproduction check against the recovered table (no adjustment):
+  structure_pooled: recovered=0.155  rebuilt=0.1604  MATCH (diff=+0.0054)
+  structure_10_15: recovered=0.148  rebuilt=0.1190  DIFFERS (diff=-0.0290)
+  structure_30_40: recovered=0.365  rebuilt=0.4453  DIFFERS (diff=+0.0803)
+  structure_80_100: recovered=0.331  rebuilt=0.3856  DIFFERS (diff=+0.0546)
+  type_pooled: recovered=0.011  rebuilt=0.0113  MATCH (diff=+0.0003)
+  type_10_15: recovered=0.003  rebuilt=0.0028  MATCH (diff=-0.0002)
+  type_30_40: recovered=0.033  rebuilt=0.0327  MATCH (diff=-0.0003)
+  type_80_100: recovered=0.004  rebuilt=0.0035  MATCH (diff=-0.0005)
+
+======================================================================
+SECTION A -- degree nulls, three fits
+======================================================================
+  10-15: n_total=640  episodes with NO defined degree at all=0
+  30-40: n_total=1770  episodes with NO defined degree at all=0
+  80-100: n_total=2000  episodes with NO defined degree at all=0
+  pooled: n_total=4410  episodes with NO defined degree at all=0
+
+A3 three fits (degree-defined subset n=4410 vs full n=4410):
+  (i) STRUCTURE with degree, degree-defined subset: pooled R2=0.1604 (n=4410)  10-15=0.1190(n=640)  30-40=0.4453(n=1770)  80-100=0.3856(n=2000)
+  (ii) STRUCTURE without degree, SAME subset: pooled R2=0.1464 (n=4410)  10-15=0.1189(n=640)  30-40=0.4259(n=1770)  80-100=0.1537(n=2000)
+  (iii) STRUCTURE without degree, full 4410-equivalent: pooled R2=0.1464 (n=4410)  10-15=0.1189(n=640)  30-40=0.4259(n=1770)  80-100=0.1537(n=2000)
+  TYPE, degree-defined subset: pooled R2=0.0113 (n=4410)  10-15=0.0028(n=640)  30-40=0.0327(n=1770)  80-100=0.0035(n=2000)
+  TYPE, full population: pooled R2=0.0113 (n=4410)  10-15=0.0028(n=640)  30-40=0.0327(n=1770)  80-100=0.0035(n=2000)
+
+A4: recovered STRUCTURE reports pooled n=4410 (the FULL population). Episodes lacking a defined degree, pooled: 0. Fit (ii) and (iii) are therefore identical by construction.
+
+======================================================================
+STEP 2 -- three discrepancies
+======================================================================
+2a. STRUCTURE with vs without degree (see Section A fits (i) and (ii) above).
+
+2b. The two 0.002s:
+  R2 of degree alone, pooled: 0.0016 (n=4410)
+  R2 of degree alone, 10-15: 0.0238 (n=640)
+  R2 of degree alone, 30-40: 0.1272 (n=1770)
+  R2 of degree alone, 80-100: 0.0271 (n=2000)
+
+  detectable R2 floor, STRUCTURE (k=3), pooled n=4410: 0.00247
+    10-15 (n=640): 0.01685
+    30-40 (n=1770): 0.00614
+    80-100 (n=2000): 0.00543
+  detectable R2 floor, single predictor (k=1), pooled n=4410: 0.00178
+    10-15 (n=640): 0.01215
+    30-40 (n=1770): 0.00442
+    80-100 (n=2000): 0.00391
+
+2c. Episode-level vs 117-cell-level fit:
+  cell-level n=117 (expect 117)
+  STRUCTURE: episode-level R2=0.1604 (n=4410)  vs  cell-level R2=0.3045 (n=117)  gap=-0.1441
+  TYPE: episode-level R2=0.0113 (n=4410)  vs  cell-level R2=0.0601 (n=117)  gap=-0.0488
+
+  detectable-R2 floor at n=4410 (treating episodes as independent): 0.00247
+  detectable-R2 floor at n=117 (cells): 0.08798
+  ratio (117-floor / 4410-floor): 35.6x -- a floor computed at n=4410 is this many times too optimistic if episodes are not independent.
+
+======================================================================
+STEP 3 -- cell-level bootstrap (10,000 resamples, seed=20260810)
+======================================================================
+  structure_pooled: median=0.3187  95% CI=[0.2143, 0.4407]
+  type_pooled: median=0.0613  95% CI=[0.0074, 0.1527]
+  ratio: median=5.1536  95% CI=[1.9033, 43.2592]
+  structure_10-15: median=0.4414  95% CI=[0.2323, 0.6558]
+  type_10-15: median=0.0241  95% CI=[0.0001, 0.2059]
+  structure_30-40: median=0.3767  95% CI=[0.1509, 0.5927]
+  type_30-40: median=0.0275  95% CI=[0.0001, 0.2242]
+  structure_80-100: median=0.2481  95% CI=[0.0507, 0.5247]
+  type_80-100: median=0.1268  95% CI=[0.0038, 0.3762]
+
+Done.
