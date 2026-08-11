@@ -1,0 +1,4 @@
+band,total_membership_leave,single_node,batch,single_plus_batch_eq_total,target_total,target_single,target_batch,n_jsonl_files,n_jsonl_files_zero_contribution,n_group_i,n_group_ii,episode_clusters_2tuple_seed_episode,episode_clusters_3tuple_seed_scenario_episode,target_episode_clusters
+10-15,5101,4965,136,True,5101,4965,136,38,28,1176,3789,173,730,173
+30-40,1651,1483,168,True,1651,1483,168,23,13,101,1382,49,148,49
+80-100,2962,2708,254,True,2962,2708,254,26,16,27,2681,66,208,66
