@@ -1,0 +1,5 @@
+dataset,band,n_rows_read,n_rows_used,n_rows_dropped_missing_col,n_visible,n_not_visible,unknown_fraction,discfrac_median
+graphdepth_sweep,10-15,1399,1399,0.0,1399,0,0.0,0.7
+graphdepth_sweep,30-40,1672,1672,0.0,1672,0,0.0,0.7352941176470589
+graphdepth_sweep,80-100,3127,3127,0.0,3127,0,0.0,0.8571428571428571
+graphdepth_sweep,POOLED,6198,6198,,6198,0,0.0,
