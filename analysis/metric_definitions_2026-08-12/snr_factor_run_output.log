@@ -1,0 +1,26 @@
+=== Q2: norm(h1)/norm(h2) on the SNR-eligible membership_leave population ===
+
+--- band 10-15 (n=1612) ---
+  norm_h1/norm_h2: median=0.9761  [min=0.3896, max=1.7372]  [p5=0.7790, p95=1.0472]
+  snr as coded (change_drift_full/agent_drift_full): median=1.0847
+  snr if intended as norm(h3-h2)/norm(h2-h1) (no h1/h2-norm factor): median=1.1640
+  ratio of the two SNR readings (median): 0.9319
+
+--- band 30-40 (n=6764) ---
+  norm_h1/norm_h2: median=0.9945  [min=0.3621, max=1.2369]  [p5=0.8939, p95=1.0116]
+  snr as coded (change_drift_full/agent_drift_full): median=0.6787
+  snr if intended as norm(h3-h2)/norm(h2-h1) (no h1/h2-norm factor): median=0.6930
+  ratio of the two SNR readings (median): 0.9794
+
+--- band 80-100 (n=10282) ---
+  norm_h1/norm_h2: median=0.9984  [min=0.3941, max=1.1926]  [p5=0.9151, p95=1.0065]
+  snr as coded (change_drift_full/agent_drift_full): median=0.1854
+  snr if intended as norm(h3-h2)/norm(h2-h1) (no h1/h2-norm factor): median=0.1862
+  ratio of the two SNR readings (median): 0.9953
+
+=== pooled across all 3 bands ===
+  norm_h1/norm_h2: median=0.9968  [min=0.3621, max=1.7372]  [p5=0.8901, p95=1.0101]
+  snr as coded: median=0.3827
+  snr if intended (movement ratio only): median=0.3897
+
+Done.
