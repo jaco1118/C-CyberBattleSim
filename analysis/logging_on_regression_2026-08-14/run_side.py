@@ -53,19 +53,36 @@ RUN_FOLDER = os.path.join(
 TOPOLOGY_PKL = os.path.join(REPO_ROOT_REAL, "cyberbattle/data/env_samples/scalability_10_15/1/network_SecureBERT.pkl")
 
 # Constructor kwarg allow-list for the pre-instrumentation side (7cdfb2b), read directly from
-# that commit's own CyberBattleEnv.__init__ / CyberBattleCompressedEnv.__init__ signatures.
+# that commit's own CyberBattleEnv.__init__ / CyberBattleCompressedEnv.__init__ signatures
+# (git show 7cdfb2b:cyberbattle/_env/cyberbattle_env.py / cyberbattle_env_compressed.py).
+# CORRECTED after the first full run: the original list omitted winning_reward/losing_reward/
+# stop_at_goal_reached (this checkpoint's train_config.yaml has winning_reward=4000,
+# stop_at_goal_reached=true) -- their absence silently fell back to Side A's constructor
+# defaults (winning_reward=0, stop_at_goal_reached=False), which is why the first run showed a
+# large, spurious divergence the instant the goal was first reached (Side A kept playing with
+# reward=0 and done=False; Side B got reward=4000 and done=True). That divergence was a bug in
+# this comparison script, not a difference between the pre-instrumentation and current-HEAD
+# environment code -- confirmed separately via the B-vs-B_off diagnostic control (see run_all.sh
+# history / RUN_RECORD.md), which showed zero divergence between drift_logging=True and
+# drift_logging=False on the SAME (current-HEAD) commit, before this fix was even applied.
 SIDE_A_ALLOWED_TRAIN_CONFIG_KEYS = {
-    "goal", "rewards_dict", "penalties_dict", "episode_iterations",
+    # CyberBattleEnv.__init__ (base class, reached via **kwargs)
+    "winning_reward", "losing_reward", "random_starter_node", "absolute_reward",
+    "stop_at_goal_reached", "rewards_dict", "penalties_dict", "isolation_filter_threshold",
+    "max_services_per_node", "goal", "switch_interest_node_interval", "interest_node_value",
+    "static_defender_agent", "static_defender_eviction_goal", "episode_iterations",
+    "proportional_cutoff_coefficient", "max_num_trials_find_feasible_starter_node",
     "change_interval", "change_type", "patch_service_dynamic_enabled", "dynamic_mode",
     "dynamic_min_alive_nodes", "dynamic_min_alive_fraction", "dynamic_batch_interval",
     "dynamic_batch_size_mean", "dynamic_batch_max_fraction", "dynamic_degree_weighting",
     "dynamic_max_alive_nodes", "dynamic_max_alive_fraction", "dynamic_max_joins_per_episode",
     "dynamic_join_rate_interval", "dynamic_join_batch_interval", "dynamic_join_batch_size_mean",
     "dynamic_join_batch_max_fraction", "dynamic_join_value_weighting",
-    "graph_embeddings_aggregations", "node_embeddings_dimensions", "outcome_dimensions",
-    "discrete_features", "pca_components", "distance_metric", "sample_subset_samples",
-    "remove_all_obstacles", "remove_main_obstacles", "precise_action_space_positions",
-    "precise_graph_encoding",
+    # CyberBattleCompressedEnv.__init__
+    "edge_feature_aggregations", "graph_embeddings_aggregations", "node_embeddings_dimensions",
+    "outcome_dimensions", "discrete_features", "pca_components", "distance_metric",
+    "sample_subset_samples", "remove_all_obstacles", "remove_main_obstacles",
+    "precise_action_space_positions", "precise_graph_encoding",
 }
 
 
