@@ -1,0 +1,54 @@
+=== LOGGING-ON-REGRESSION: STEP 3/4 comparison, Side A (pre-instrumentation, 7cdfb2b) vs Side B (current HEAD, drift_logging=True) ===
+
+--- seed 42 ---
+  Side A rows: 2000
+  Side B rows: 2000
+  steps compared: 2000
+    source_node: zero differing
+    target_node: zero differing
+    vulnerability: zero differing
+    outcome: zero differing
+    min_distance_action: zero differing
+    reward: zero differing
+    done: zero differing
+    cumulative_reward: zero differing
+    n_discovered: zero differing
+    n_root_owned: zero differing
+  observation: bitwise-equal steps = 2000/2000
+  ZERO DIFFERING across all 2000 steps, all items, observation bitwise-equal.
+
+--- seed 100 ---
+  Side A rows: 2000
+  Side B rows: 2000
+  steps compared: 2000
+    source_node: zero differing
+    target_node: zero differing
+    vulnerability: zero differing
+    outcome: zero differing
+    min_distance_action: zero differing
+    reward: zero differing
+    done: zero differing
+    cumulative_reward: zero differing
+    n_discovered: zero differing
+    n_root_owned: zero differing
+  observation: bitwise-equal steps = 2000/2000
+  ZERO DIFFERING across all 2000 steps, all items, observation bitwise-equal.
+
+--- seed 123 ---
+  Side A rows: 2000
+  Side B rows: 2000
+  steps compared: 2000
+    source_node: zero differing
+    target_node: zero differing
+    vulnerability: zero differing
+    outcome: zero differing
+    min_distance_action: zero differing
+    reward: zero differing
+    done: zero differing
+    cumulative_reward: zero differing
+    n_discovered: zero differing
+    n_root_owned: zero differing
+  observation: bitwise-equal steps = 2000/2000
+  ZERO DIFFERING across all 2000 steps, all items, observation bitwise-equal.
+
+=== OVERALL VERDICT: identical ===

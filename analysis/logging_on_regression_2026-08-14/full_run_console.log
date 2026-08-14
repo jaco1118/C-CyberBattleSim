@@ -1,0 +1,83 @@
+[1/4] extracting pre-instrumentation commit 7cdfb2b into /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/scratch_side_a_7cdfb2b
+  done: 9 files under _env
+[2/4] Side A runs (pre-instrumentation, /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/scratch_side_a_7cdfb2b)
+  seed=42
+/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib/python3.10/site-packages/torch_geometric/utils/convert.py:278: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:253.)
+  data_dict[key] = torch.as_tensor(value)
+[A seed=42] wrote 2000 rows to /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/side_A_seed42.pkl (repo_root=/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/scratch_side_a_7cdfb2b)
+  seed=100
+/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib/python3.10/site-packages/torch_geometric/utils/convert.py:278: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:253.)
+  data_dict[key] = torch.as_tensor(value)
+[A seed=100] wrote 2000 rows to /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/side_A_seed100.pkl (repo_root=/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/scratch_side_a_7cdfb2b)
+  seed=123
+/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib/python3.10/site-packages/torch_geometric/utils/convert.py:278: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:253.)
+  data_dict[key] = torch.as_tensor(value)
+[A seed=123] wrote 2000 rows to /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/side_A_seed123.pkl (repo_root=/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/scratch_side_a_7cdfb2b)
+[3/4] Side B runs (current HEAD, /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim, drift_logging=True)
+  seed=42
+/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib/python3.10/site-packages/torch_geometric/utils/convert.py:278: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:253.)
+  data_dict[key] = torch.as_tensor(value)
+[B seed=42] wrote 2000 rows to /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/side_B_seed42.pkl (repo_root=/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim)
+  seed=100
+/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib/python3.10/site-packages/torch_geometric/utils/convert.py:278: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:253.)
+  data_dict[key] = torch.as_tensor(value)
+[B seed=100] wrote 2000 rows to /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/side_B_seed100.pkl (repo_root=/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim)
+  seed=123
+/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib/python3.10/site-packages/torch_geometric/utils/convert.py:278: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:253.)
+  data_dict[key] = torch.as_tensor(value)
+[B seed=123] wrote 2000 rows to /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/logging_on_regression_2026-08-14/side_B_seed123.pkl (repo_root=/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim)
+[4/4] comparing
+=== LOGGING-ON-REGRESSION: STEP 3/4 comparison, Side A (pre-instrumentation, 7cdfb2b) vs Side B (current HEAD, drift_logging=True) ===
+
+--- seed 42 ---
+  Side A rows: 2000
+  Side B rows: 2000
+  steps compared: 2000
+    source_node: zero differing
+    target_node: zero differing
+    vulnerability: zero differing
+    outcome: zero differing
+    min_distance_action: zero differing
+    reward: zero differing
+    done: zero differing
+    cumulative_reward: zero differing
+    n_discovered: zero differing
+    n_root_owned: zero differing
+  observation: bitwise-equal steps = 2000/2000
+  ZERO DIFFERING across all 2000 steps, all items, observation bitwise-equal.
+
+--- seed 100 ---
+  Side A rows: 2000
+  Side B rows: 2000
+  steps compared: 2000
+    source_node: zero differing
+    target_node: zero differing
+    vulnerability: zero differing
+    outcome: zero differing
+    min_distance_action: zero differing
+    reward: zero differing
+    done: zero differing
+    cumulative_reward: zero differing
+    n_discovered: zero differing
+    n_root_owned: zero differing
+  observation: bitwise-equal steps = 2000/2000
+  ZERO DIFFERING across all 2000 steps, all items, observation bitwise-equal.
+
+--- seed 123 ---
+  Side A rows: 2000
+  Side B rows: 2000
+  steps compared: 2000
+    source_node: zero differing
+    target_node: zero differing
+    vulnerability: zero differing
+    outcome: zero differing
+    min_distance_action: zero differing
+    reward: zero differing
+    done: zero differing
+    cumulative_reward: zero differing
+    n_discovered: zero differing
+    n_root_owned: zero differing
+  observation: bitwise-equal steps = 2000/2000
+  ZERO DIFFERING across all 2000 steps, all items, observation bitwise-equal.
+
+=== OVERALL VERDICT: identical ===
