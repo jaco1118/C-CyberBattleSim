@@ -110,7 +110,7 @@ def main():
 
     if side_tag == "A":
         kwargs = {k: v for k, v in train_config.items() if k in SIDE_A_ALLOWED_TRAIN_CONFIG_KEYS}
-    else:
+    elif side_tag == "B":
         kwargs = {k: v for k, v in train_config.items() if k != "verbose"}
         kwargs["drift_logging"] = True
         kwargs["drift_sample_rate"] = 1
@@ -118,6 +118,14 @@ def main():
         kwargs["drift_run_id"] = f"logging_on_regression_seed{seed}"
         kwargs["drift_seed"] = seed
         kwargs["drift_scenario_id"] = "scalability_10_15_1"
+    elif side_tag == "B_off":
+        # Diagnostic control (added after the first full run diverged): current HEAD, but with
+        # drift_logging left at its default (False) -- isolates whether a divergence from Side A
+        # is caused by the instrumentation itself, or by unrelated code changes accumulated in
+        # the current-HEAD tree since commit 7cdfb2b (three-plus weeks of unrelated development).
+        kwargs = {k: v for k, v in train_config.items() if k != "verbose"}
+    else:
+        raise ValueError(f"unknown side_tag {side_tag!r}")
 
     env = ccenv.CyberBattleCompressedEnv(initial_environment=network, logger=logger, verbose=0, **kwargs)
     env.set_graph_encoder(graph_encoder)
