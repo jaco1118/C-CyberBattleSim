@@ -1,0 +1,120 @@
+=== ADDITION 1: population (a), root-owned-count, both conventions ===
+
+Largest convention-induced difference: band 10-15 seed 123: stop=250000 -> -4.81%, default -> +10.00%, diff = +14.81pp
+
+    band  seed  delta%(stop=250k)  delta%(default)   diff(pp)
+   10-15    42              7.20%            3.13%     -4.07
+   10-15   100             21.98%           21.43%     -0.55
+   10-15   123             -4.81%           10.00%    +14.81
+   10-15   200             36.87%           25.00%    -11.87
+   10-15   300             -1.92%            3.33%     +5.26
+   30-40    42             -0.34%           -0.50%     -0.16
+   30-40   100            -18.20%          -23.81%     -5.61
+   30-40   123              4.55%            2.16%     -2.39
+   30-40   200              3.05%            2.66%     -0.39
+   30-40   300             -0.33%           -6.67%     -6.34
+  80-100    42             23.87%           23.28%     -0.59
+  80-100   100              1.68%            1.27%     -0.42
+  80-100   123             15.56%           13.64%     -1.92
+  80-100   200            -10.09%          -10.32%     -0.22
+  80-100   300             48.37%           51.15%     +2.79
+
+--- band-level summary, root-owned-count, both conventions ---
+    band   mean|d%|(250k)  within(250k)  mean|d%|(default)  within(default)
+   10-15           14.55%          2/5               12.58%             2/5
+   30-40            5.29%          4/5                7.16%             3/5
+  80-100           19.91%          1/5               19.93%             1/5
+
+
+=== ADDITION 2: reward-based delta_pct, both conventions, every population ===
+
+           pop         cell  seed  rew d%(250k)  rew d%(default)   diff(pp)
+    a-manifest        10-15    42       -13.11%          -12.74%     +0.37
+    a-manifest        10-15   100        -6.14%           -1.03%     +5.10
+    a-manifest        10-15   123        20.42%           28.11%     +7.69
+    a-manifest        10-15   200       -16.86%          -15.29%     +1.57
+    a-manifest        10-15   300        -9.92%          -10.31%     -0.39
+    a-manifest        30-40    42         7.62%            9.50%     +1.88
+    a-manifest        30-40   100         9.63%            7.31%     -2.32
+    a-manifest        30-40   123        -1.64%           -2.60%     -0.96
+    a-manifest        30-40   200        18.23%           15.15%     -3.08
+    a-manifest        30-40   300       -24.77%          -26.68%     -1.91
+    a-manifest       80-100    42         6.54%            5.82%     -0.72
+    a-manifest       80-100   100        15.37%           16.02%     +0.65
+    a-manifest       80-100   123        23.50%           23.29%     -0.20
+    a-manifest       80-100   200         4.72%            0.93%     -3.79
+    a-manifest       80-100   300        22.15%           19.65%     -2.50
+         b-N30          N30    42         1.67%            1.86%     +0.19
+         b-N30          N30   100         2.65%            2.63%     -0.02
+         b-N30          N30   123         1.48%            1.18%     -0.30
+         b-N30          N30   200         1.88%            1.59%     -0.29
+         b-N30          N30   300        -0.69%           -1.29%     -0.60
+         b-N60          N60    42        -1.61%           -1.58%     +0.04
+         b-N60          N60   100        -0.14%            0.06%     +0.19
+         b-N60          N60   123        -1.85%           -2.08%     -0.23
+         b-N60          N60   200         1.24%            0.42%     -0.82
+         b-N60          N60   300         2.04%            1.25%     -0.80
+         b-N90          N90    42        -7.27%            0.12%     +7.40
+         b-N90          N90   100        -2.29%           -2.11%     +0.18
+         b-N90          N90   123         4.19%           -0.31%     -4.50
+         b-N90          N90   200        18.09%            3.21%    -14.88
+         b-N90          N90   300         1.85%            1.75%     -0.10
+  c-lowdeg-N30  N30(lowdeg)    42         7.28%            7.06%     -0.22
+  c-lowdeg-N30  N30(lowdeg)   100         2.36%            1.90%     -0.46
+  c-lowdeg-N30  N30(lowdeg)   123         4.15%            3.55%     -0.60
+  c-lowdeg-N30  N30(lowdeg)   200         1.70%            1.25%     -0.45
+  c-lowdeg-N30  N30(lowdeg)   300         3.94%            4.35%     +0.41
+
+--- cross-convention swing, both metrics, all 35 rows ---
+  root-owned-count |diff|: mean=3.285pp  median=2.310pp  max=14.808pp
+  reward           |diff|: mean=1.880pp  median=0.603pp  max=14.876pp
+
+
+=== STEP 1 (default convention, the project standard from here on) ===
+
+           pop         cell  seed    node d%  node within     rew d%  rew within
+    a-manifest        10-15    42     +3.13%          YES    -12.74%          no
+    a-manifest        10-15   100    +21.43%           no     -1.03%         YES
+    a-manifest        10-15   123    +10.00%           no    +28.11%          no
+    a-manifest        10-15   200    +25.00%           no    -15.29%          no
+    a-manifest        10-15   300     +3.33%          YES    -10.31%          no
+    a-manifest        30-40    42     -0.50%          YES     +9.50%          no
+    a-manifest        30-40   100    -23.81%           no     +7.31%          no
+    a-manifest        30-40   123     +2.16%          YES     -2.60%         YES
+    a-manifest        30-40   200     +2.66%          YES    +15.15%          no
+    a-manifest        30-40   300     -6.67%           no    -26.68%          no
+    a-manifest       80-100    42    +23.28%           no     +5.82%          no
+    a-manifest       80-100   100     +1.27%          YES    +16.02%          no
+    a-manifest       80-100   123    +13.64%           no    +23.29%          no
+    a-manifest       80-100   200    -10.32%           no     +0.93%         YES
+    a-manifest       80-100   300    +51.15%           no    +19.65%          no
+         b-N30          N30    42     +4.78%          YES     +1.86%         YES
+         b-N30          N30   100     +8.47%           no     +2.63%         YES
+         b-N30          N30   123     -1.70%          YES     +1.18%         YES
+         b-N30          N30   200     -1.86%          YES     +1.59%         YES
+         b-N30          N30   300     +4.08%          YES     -1.29%         YES
+         b-N60          N60    42     +1.83%          YES     -1.58%         YES
+         b-N60          N60   100     -9.22%           no     +0.06%         YES
+         b-N60          N60   123     -2.17%          YES     -2.08%         YES
+         b-N60          N60   200    -14.37%           no     +0.42%         YES
+         b-N60          N60   300     -0.92%          YES     +1.25%         YES
+         b-N90          N90    42     +1.09%          YES     +0.12%         YES
+         b-N90          N90   100     -1.25%          YES     -2.11%         YES
+         b-N90          N90   123     -4.10%          YES     -0.31%         YES
+         b-N90          N90   200     +1.28%          YES     +3.21%         YES
+         b-N90          N90   300     -3.15%          YES     +1.75%         YES
+  c-lowdeg-N30  N30(lowdeg)    42     +5.88%           no     +7.06%          no
+  c-lowdeg-N30  N30(lowdeg)   100     +3.14%          YES     +1.90%         YES
+  c-lowdeg-N30  N30(lowdeg)   123     +2.45%          YES     +3.55%         YES
+  c-lowdeg-N30  N30(lowdeg)   200     +1.44%          YES     +1.25%         YES
+  c-lowdeg-N30  N30(lowdeg)   300     -0.43%          YES     +4.35%         YES
+
+--- population/cell-level summary, default convention ---
+             population/cell  mean|d%|(node)  within(node)   verdict(node)  mean|d%|(rew)  within(rew)   verdict(rew)   AGREE?
+            a-manifest/10-15          12.58%          2/5     NOT CONVERGED         13.50%         1/5    NOT CONVERGED    AGREE
+            a-manifest/30-40           7.16%          3/5     NOT CONVERGED         12.25%         1/5    NOT CONVERGED    AGREE
+           a-manifest/80-100          19.93%          1/5     NOT CONVERGED         13.14%         1/5    NOT CONVERGED    AGREE
+                   b-N30/N30           4.18%          4/5         CONVERGED          1.71%         5/5        CONVERGED    AGREE
+                   b-N60/N60           5.70%          3/5     NOT CONVERGED          1.08%         5/5        CONVERGED DISAGREE
+                   b-N90/N90           2.18%          5/5         CONVERGED          1.50%         5/5        CONVERGED    AGREE
+    c-lowdeg-N30/N30(lowdeg)           2.67%          4/5         CONVERGED          3.62%         4/5        CONVERGED    AGREE
