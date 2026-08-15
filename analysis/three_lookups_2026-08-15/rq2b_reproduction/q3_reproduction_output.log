@@ -1,0 +1,26 @@
+
+==============================================================================
+TOPOLOGY #44  [PRIMARY]  band 10-15
+==============================================================================
+  per-arm mean terminal root-owned COUNT (5 seeds):
+    arm1 full-256 [mean,max,min]     static  9.774  change  6.327
+    arm2 mean-only-128 [mean]        static  9.730  change  6.343
+    arm3 256 extremal-zeroed         static  9.706  change  6.251
+  MDE (pooled between-seed SD, static, n=15): 0.085 nodes = 0.9% of static mean (9.737)
+  arm contrasts under CHANGE (paired by seed):
+         INFO: mean diff = +0.076  (paired SD 0.190)  95% CI [-0.080, +0.219]  |  EFFECT ABSENT (well-powered: |diff|<MDE, CI brackets 0)
+     CAPACITY: mean diff = -0.092  (paired SD 0.207)  95% CI [-0.237, +0.093]  |  UNDERPOWERED (noise floor too large to call)
+          RAW: mean diff = -0.016  (paired SD 0.068)  95% CI [-0.070, +0.038]  |  EFFECT ABSENT (well-powered: |diff|<MDE, CI brackets 0)
+
+==============================================================================
+TOPOLOGY #34  [SECONDARY (robustness)]  band 10-15
+==============================================================================
+  per-arm mean terminal root-owned COUNT (5 seeds):
+    arm1 full-256 [mean,max,min]     static  7.535  change  5.206
+    arm2 mean-only-128 [mean]        static  7.634  change  5.252
+    arm3 256 extremal-zeroed         static  7.495  change  5.264
+  MDE (pooled between-seed SD, static, n=15): 0.162 nodes = 2.1% of static mean (7.555)
+  arm contrasts under CHANGE (paired by seed):
+         INFO: mean diff = -0.058  (paired SD 0.167)  95% CI [-0.179, +0.088]  |  EFFECT ABSENT (well-powered: |diff|<MDE, CI brackets 0)
+     CAPACITY: mean diff = +0.012  (paired SD 0.116)  95% CI [-0.064, +0.112]  |  EFFECT ABSENT (well-powered: |diff|<MDE, CI brackets 0)
+          RAW: mean diff = -0.046  (paired SD 0.217)  95% CI [-0.207, +0.133]  |  EFFECT ABSENT (well-powered: |diff|<MDE, CI brackets 0)
