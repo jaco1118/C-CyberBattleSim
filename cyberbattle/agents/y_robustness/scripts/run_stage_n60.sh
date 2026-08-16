@@ -7,7 +7,9 @@ PY=/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/bin/python
 export LD_LIBRARY_PATH=/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib:${LD_LIBRARY_PATH:-}
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 N_EP=200
-mkdir -p "$AG/y_robustness/out/n60" "$AG/y_robustness/logs_run"
+TAG="${N60_TAG:?set N60_TAG, e.g. ci7, to route this run to its own output/log path, not the committed ci=5 run}"
+OUTDIR="y_robustness/out/n60_${TAG}"
+mkdir -p "$AG/$OUTDIR" "$AG/y_robustness/logs_run"
 cd "$AG"
 
 declare -A RUN CS TOPO
@@ -21,12 +23,12 @@ pids=()
 for cell in n60_42 n60_100 n60_123 n60_200 n60_300; do
   seed="${cell#n60_}"
   CKPT_STEP="${CS[$cell]}" nohup nice -n 5 "$PY" y_robustness/scripts/taskF2_eval.py \
-    "${RUN[$cell]}" "$seed" "${TOPO[$cell]}" static "$N_EP" y_robustness/out/n60 \
-    > "y_robustness/logs_run/${cell}_static.log" 2>&1 &
+    "${RUN[$cell]}" "$seed" "${TOPO[$cell]}" static "$N_EP" "$OUTDIR" \
+    > "y_robustness/logs_run/${cell}_${TAG}_static.log" 2>&1 &
   pids+=($!)
   CKPT_STEP="${CS[$cell]}" nohup nice -n 5 "$PY" y_robustness/scripts/taskF2_eval.py \
-    "${RUN[$cell]}" "$seed" "${TOPO[$cell]}" membership_matched "$N_EP" y_robustness/out/n60 "${CI_N60:?set CI_N60 to the STEP 1 calibrated change_interval before running}" \
-    > "y_robustness/logs_run/${cell}_membership_matched.log" 2>&1 &
+    "${RUN[$cell]}" "$seed" "${TOPO[$cell]}" membership_matched "$N_EP" "$OUTDIR" "${CI_N60:?set CI_N60 to the STEP 1 calibrated change_interval before running}" \
+    > "y_robustness/logs_run/${cell}_${TAG}_membership_matched.log" 2>&1 &
   pids+=($!)
 done
 
