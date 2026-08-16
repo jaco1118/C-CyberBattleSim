@@ -1,0 +1,13 @@
+=== SAFETY CONFIRMATION ===
+Reads existing per-seed robustness values (already-logged score CSVs) and resamples them. No training, no environment reset, no new episode, no checkpoint/encoder touched, no step()/encode()/reward path modified.
+
+N=30 (n30), n=5: 42=0.6802, 100=0.7686, 123=0.6740, 200=0.6983, 300=0.7066  mean=0.7056 sd=0.0376
+N=60 (n60_ci7), n=5: 42=0.7029, 100=0.6570, 123=0.6281, 200=0.6781, 300=0.7342  mean=0.6801 sd=0.0409
+N=90 (n90), n=5: 42=0.6805, 100=0.6486, 123=0.6755, 200=0.6924, 300=0.7194  mean=0.6833 sd=0.0258
+
+N=30 vs N=60: point diff (N60-N30) = -0.0255, bootstrap 95% CI (NB=10000, seed=11, seed-resampled independently per cell) = [-0.0679, +0.0176]  INCLUDES 0
+  MDE (pooled between-seed SD, ddof=1, n=10) = 0.0394 robustness units, |point diff|/MDE = 0.647
+N=60 vs N=90: point diff (N90-N60) = +0.0032, bootstrap 95% CI (NB=10000, seed=11, seed-resampled independently per cell) = [-0.0355, +0.0424]  INCLUDES 0
+  MDE (pooled between-seed SD, ddof=1, n=10) = 0.0323 robustness units, |point diff|/MDE = 0.099
+
+Written: /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/nodecount_ci_n60_2026-08-16/nodecount_ci_n60_result.csv
