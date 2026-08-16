@@ -6,6 +6,20 @@ N=60 cell newly eligible for Table IV.5.
 
 Date run: 2026-08-16.
 
+## Statement of procedure
+Three full 200-episode/5-seed evaluations of this cell were run, at
+change_interval 5, 7, and 8. ci=7 was selected on achieved churn alone, against a
+tolerance (42.0% +/-1.5pp) declared before any of the three ran. Robustness was not
+computed or inspected for any candidate until after ci=7 was selected.
+
+| change_interval | pooled achieved churn | outcome |
+|---|---|---|
+| 5 | 47.18% | rejected, out of band |
+| 7 | 42.23% | selected |
+| 8 | 40.12% | rejected, out of band |
+
+None of the three runs is deleted; all three remain on disk and in this record.
+
 ## Why this run exists
 STEP 2 at ci=5 (`y_robustness/out/n60/`, committed `9a49be0`) achieved 47.18% pooled
 churn against the 42.0% reference -- outside the +/-1.5pp band. That run is REJECTED
@@ -79,8 +93,21 @@ orchestrator `failed=0` for both batches (all 20 PIDs individually exit=0).
 Exactly one of the two lands in band: ci=7 does, ci=8 does not. Per the pre-declared
 rule ("If exactly one of ci=7 and ci=8 lands in band, it is selected"), this is a
 mechanical outcome of the rule applied to the numbers above, not a judgement call.
-No robustness figure for either candidate has been computed, opened, or looked at
-in producing this record. Awaiting confirmation before STAGE C.
+No robustness figure for either candidate was computed, opened, or looked at before
+selection.
+
+## STAGE C: ci=7 robustness (raw root_owned count, matched-undisturbed-paired)
+| seed | static root_owned mean | matched root_owned mean | robustness |
+|---|---|---|---|
+| 42  | 26.9300 | 18.9300 | 0.7029 |
+| 100 | 28.3250 | 18.6100 | 0.6570 |
+| 123 | 30.9350 | 19.4300 | 0.6281 |
+| 200 | 29.8100 | 20.2150 | 0.6781 |
+| 300 | 28.0650 | 20.6050 | 0.7342 |
+
+Undefined (zero static mean) seeds: 0.
+
+Cell mean robustness = 0.6801. Cell SD = 0.0409.
 
 ## Outputs (committed alongside this record)
 `n60_ci7/score_static_seed<seed>_eval{static,membership_matched}.csv`,
