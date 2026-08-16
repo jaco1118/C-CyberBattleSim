@@ -42,6 +42,18 @@ independent of the CSV collision and were not affected by it. From the second ba
 onward (ci=5, 6, 7), each trial was routed to its own subdirectory (`ci5/`, `ci6/`,
 `ci7/`) to prevent recurrence; those three trials' CSVs are intact and committed.
 
+**This explains a previously-unexplained gap in the N=90 precedent.** Task Q3 (STEP
+0) recorded, without a known cause, that "only the final trial's CSV survives on
+disk" for N=90's original ~7-trial calibration sweep (`calib/`, 2026-08-06
+10:09:51-10:22:25 UTC). Those trials were launched sequentially, not concurrently
+(one `taskF2_eval.py` CLI call at a time, per the session transcript), so there was
+no race in that case -- but the identical root cause applies: the script names its
+output by (agent_cond, seed, eval_cond) only, never by change_interval, so each
+sequential trial's write silently overwrote the previous trial's identical-named
+CSV. My concurrent version surfaced the same defect as a race; the original
+sequential version surfaced it as silent overwrite. Same script, same clobbering,
+now identified rather than merely observed.
+
 ## Full sweep (every integer tried)
 | change_interval | leave/ep | churn (% of 60) | distance from 42.0% | in [40.5, 43.5]%? |
 |---|---|---|---|---|
@@ -54,9 +66,15 @@ onward (ci=5, 6, 7), each trial was routed to its own subdirectory (`ci5/`, `ci6
 
 Note: ci=5 achieved *less* churn than ci=6 (25.30 vs 25.87 leave/ep) -- the opposite of
 the monotonic-decreasing-with-ci pattern the N=90 precedent showed cleanly at every
-step. Not smoothed over or re-run further to force monotonicity: at n=30 episodes,
-single seed, this is within plausible sampling noise (frac0 across all 6 trials
-ranged 0.033-0.100, mean score 0.469-0.540) and is reported as observed.
+step. **Reported as observed, not re-run to smooth it out, and not treated as a
+finding.** A plausible mechanism, UNVERIFIED: at short change_interval the pool of
+currently-removable/eligible nodes may thin faster than it replenishes within a
+300-step episode, so more frequent removal attempts do not translate one-for-one
+into more realized removals -- a saturation effect at the aggressive end of the
+sweep. This is offered only as a candidate explanation, not investigated further
+(no additional probes run to test it) and not asserted as the cause; at n=30
+episodes, single seed, ordinary sampling noise (frac0 across all 6 trials ranged
+0.033-0.100, mean score 0.469-0.540) remains an equally live explanation.
 
 ## Result
 **Two integers qualify: ci=5 (42.17%, +0.17pp) and ci=6 (43.12%, +1.12pp).**
@@ -72,14 +90,27 @@ rather than assumed equal:
 ## Note on the reference figure itself
 The 42.0% reference (this task's REFERENCE, per Amendment 1) is the N=30 column's
 FULL 200-episode achieved figure. The ORIGINAL N=90 calibration (2026-08-06, commit
-preceding 1ab24df) targeted a different, earlier measurement of the same quantity:
-a 30-episode N=30 probe read 12.30 leave/ep = 41.0%, and N=90's ci=4 was accepted
-against THAT 41.0% target under an explicit 2pp tolerance (both facts recovered from
-that commit's message, not previously surfaced in this task's STEP 0 answer to Q3,
-which incorrectly stated no tolerance was on record -- corrected here). The 1.0pp gap
-between the 30-episode probe (41.0%) and the 200-episode full run (42.0%) for the
-SAME N=30 cell is itself informative about probe-to-full-run noise at this sample
-size, consistent with the non-monotonicity noted above.
+`1ab24df0f8b2857eeb909165ef3db3be8550d958` -- corrected here; an earlier draft of
+this record mistakenly said "commit preceding 1ab24df") targeted a different,
+earlier measurement of the same quantity: a 30-episode N=30 probe read 12.30
+leave/ep = 41.0%, and N=90's ci=4 was accepted against THAT 41.0% target under an
+explicit 2pp tolerance (both facts recovered from that commit's message, not
+previously surfaced in this task's STEP 0 answer to Q3, which incorrectly stated no
+tolerance was on record -- corrected here). The 1.0pp gap between the 30-episode
+probe (41.0%) and the 200-episode full run (42.0%) for the SAME N=30 cell is itself
+informative about probe-to-full-run noise at this sample size, consistent with the
+non-monotonicity noted above.
+
+## Tolerance comparison across the two calibrated columns
+| column | reference target | tolerance declared | source |
+|---|---|---|---|
+| N=90 | 41.0% (30-ep N=30 probe) | +/-2.0pp | commit `1ab24df`, message text |
+| N=60 | 42.0% (200-ep N=30 full run) | +/-1.5pp | Amendment 1, this task |
+
+N=60's band is tighter (1.5pp vs 2.0pp) and anchored to the more stable of the two
+available N=30 measurements (the 200-episode full run, not the 30-episode probe).
+Both bounds are shown so the N=60 column isn't read as having been held to a looser
+or unstated standard relative to the one N=90 was actually accepted under.
 
 ## Outputs (committed alongside this record)
 `ci5/score_static_seed42_evalmembership_matched.csv`,
