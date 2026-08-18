@@ -170,10 +170,43 @@ def run_n90():
     return markers, per_marker_seed, verdicts, earliest
 
 
+def write_n30_n60_csv(path, chain, per_stage_seed_results, verdicts):
+    import csv
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["stage", "seed", "stop", "pre", "fin", "delta_pct", "within",
+                    "cell_mean_abs", "cell_n_within", "cell_need", "cell_converged"])
+        for k, v in enumerate(verdicts):
+            for s in SEEDS:
+                r = per_stage_seed_results[k][s]
+                w.writerow([k + 1, s, r["stop"], r["pre"], r["fin"], r["delta_pct"], r["within"],
+                            v["mean_abs"], v["n_within"], v["need"], v["converged"]])
+
+
+def write_n90_csv(path, markers, per_marker_seed, verdicts):
+    import csv
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["cumulative_marker", "seed", "stop", "pre", "fin", "delta_pct", "within",
+                    "cell_mean_abs", "cell_n_within", "cell_need", "cell_converged"])
+        for i, m in enumerate(markers):
+            v = verdicts[i]
+            for s in SEEDS:
+                r = per_marker_seed[i][s]
+                w.writerow([m, s, r["stop"], r["pre"], r["fin"], r["delta_pct"], r["within"],
+                            v["mean_abs"], v["n_within"], v["need"], v["converged"]])
+
+
 if __name__ == "__main__":
     n30_stages, n30_verdicts, n30_earliest = run_n30_n60("N=30", N30_CHAIN)
     n60_stages, n60_verdicts, n60_earliest = run_n30_n60("N=60", N60_CHAIN)
     n90_markers, n90_stages, n90_verdicts, n90_earliest = run_n90()
+
+    OUT = "/cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/y_reward_stage_2026-08-19"
+    write_n30_n60_csv(f"{OUT}/n30_per_stage.csv", N30_CHAIN, n30_stages, n30_verdicts)
+    write_n30_n60_csv(f"{OUT}/n60_per_stage.csv", N60_CHAIN, n60_stages, n60_verdicts)
+    write_n90_csv(f"{OUT}/n90_per_marker.csv", n90_markers, n90_stages, n90_verdicts)
+    print(f"\nWritten: {OUT}/n30_per_stage.csv, n60_per_stage.csv, n90_per_marker.csv")
 
     print(f"\n{'='*90}\nSUMMARY\n{'='*90}")
     print(f"N=30: earliest durable-converged stage = "

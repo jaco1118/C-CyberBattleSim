@@ -1,0 +1,93 @@
+
+==========================================================================================
+N=30
+==========================================================================================
+  stage 1: mean|d%|=1.709%  within=5/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+      seed 42: stop= 253952 pre=8371.441 fin=8526.790 d%=  +1.86%  within=YES
+      seed 100: stop= 253952 pre=9174.144 fin=9415.855 d%=  +2.63%  within=YES
+      seed 123: stop= 253952 pre=12969.187 fin=13121.798 d%=  +1.18%  within=YES
+      seed 200: stop= 253952 pre=10479.251 fin=10645.901 d%=  +1.59%  within=YES
+      seed 300: stop= 253952 pre=10799.257 fin=10660.016 d%=  -1.29%  within=YES
+
+==========================================================================================
+N=60
+==========================================================================================
+  stage 1: mean|d%|=3.369%  within=5/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+      seed 42: stop= 253952 pre=13265.180 fin=13372.224 d%=  +0.81%  within=YES
+      seed 100: stop= 253952 pre=13399.306 fin=14056.669 d%=  +4.91%  within=YES
+      seed 123: stop= 253952 pre=16828.566 fin=17309.046 d%=  +2.86%  within=YES
+      seed 200: stop= 253952 pre=15534.480 fin=14829.395 d%=  -4.54%  within=YES
+      seed 300: stop= 253952 pre=13919.298 fin=14439.454 d%=  +3.74%  within=YES
+  stage 2: mean|d%|=3.254%  within=3/5 (need>=4)  skip=0 undefined=0  -> not converged
+      seed 42: stop= 253952 pre=15900.173 fin=16771.656 d%=  +5.48%  within=no
+      seed 100: stop= 253952 pre=13956.002 fin=15230.639 d%=  +9.13%  within=no
+      seed 123: stop= 253952 pre=17834.760 fin=17876.270 d%=  +0.23%  within=YES
+      seed 200: stop= 253952 pre=14756.398 fin=14769.861 d%=  +0.09%  within=YES
+      seed 300: stop= 253952 pre=14411.833 fin=14603.885 d%=  +1.33%  within=YES
+  stage 3: mean|d%|=3.391%  within=4/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+      seed 42: stop= 253952 pre=16600.065 fin=17403.375 d%=  +4.84%  within=YES
+      seed 100: stop= 253952 pre=16188.536 fin=15229.911 d%=  -5.92%  within=no
+      seed 123: stop= 253952 pre=17268.143 fin=17020.513 d%=  -1.43%  within=YES
+      seed 200: stop= 253952 pre=15421.984 fin=15865.743 d%=  +2.88%  within=YES
+      seed 300: stop= 253952 pre=14290.099 fin=14021.013 d%=  -1.88%  within=YES
+  stage 4: mean|d%|=3.753%  within=4/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+      seed 42: stop= 253952 pre=17161.455 fin=16600.889 d%=  -3.27%  within=YES
+      seed 100: stop= 253952 pre=16662.776 fin=16360.405 d%=  -1.81%  within=YES
+      seed 123: stop= 253952 pre=17887.704 fin=17660.449 d%=  -1.27%  within=YES
+      seed 200: stop= 253952 pre=16816.925 fin=14885.405 d%= -11.49%  within=no
+      seed 300: stop= 253952 pre=14667.087 fin=14803.205 d%=  +0.93%  within=YES
+  stage 5: mean|d%|=2.275%  within=4/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+      seed 42: stop= 253952 pre=17187.573 fin=17555.210 d%=  +2.14%  within=YES
+      seed 100: stop= 253952 pre=16271.447 fin=17224.386 d%=  +5.86%  within=no
+      seed 123: stop= 253952 pre=18304.429 fin=18651.188 d%=  +1.89%  within=YES
+      seed 200: stop= 253952 pre=17040.817 fin=16813.941 d%=  -1.33%  within=YES
+      seed 300: stop= 253952 pre=15452.274 fin=15475.700 d%=  +0.15%  within=YES
+  stage 6: mean|d%|=2.028%  within=5/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+      seed 42: stop= 253952 pre=17207.483 fin=17715.109 d%=  +2.95%  within=YES
+      seed 100: stop= 253952 pre=15686.341 fin=15991.591 d%=  +1.95%  within=YES
+      seed 123: stop= 253952 pre=19094.336 fin=18655.898 d%=  -2.30%  within=YES
+      seed 200: stop= 253952 pre=17178.698 fin=16678.708 d%=  -2.91%  within=YES
+      seed 300: stop= 253952 pre=14790.691 fin=14784.913 d%=  -0.04%  within=YES
+  stage 7: mean|d%|=1.076%  within=5/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+      seed 42: stop= 253952 pre=18114.783 fin=17829.210 d%=  -1.58%  within=YES
+      seed 100: stop= 253952 pre=16908.853 fin=16918.565 d%=  +0.06%  within=YES
+      seed 123: stop= 253952 pre=18858.001 fin=18465.890 d%=  -2.08%  within=YES
+      seed 200: stop= 253952 pre=16636.393 fin=16705.775 d%=  +0.42%  within=YES
+      seed 300: stop= 253952 pre=15232.995 fin=15423.376 d%=  +1.25%  within=YES
+
+==========================================================================================
+N=90
+==========================================================================================
+  seed 42 stage chain (nominal cumulative -> per-stage-local result):
+    cum=  500000 [    static500k] stop= 503808 d%=  -2.52% within=YES
+    cum=  750000 [    resume750k] stop= 253952 d%=  -1.89% within=YES
+    cum= 1250000 [       ext125M] stop= 503808 d%=  +0.12% within=YES
+  seed 100 stage chain (nominal cumulative -> per-stage-local result):
+    cum=  500000 [    static500k] stop= 503808 d%=  +8.17% within=no
+    cum=  750000 [    resume750k] stop= 253952 d%=  +2.16% within=YES
+    cum= 1250000 [       ext125M] stop= 503808 d%=  -1.96% within=YES
+    cum= 1500000 [ ext150M(stg1)] stop= 253952 d%=  -2.11% within=YES
+  seed 123 stage chain (nominal cumulative -> per-stage-local result):
+    cum=  500000 [    static500k] stop= 503808 d%=  -0.31% within=YES
+  seed 200 stage chain (nominal cumulative -> per-stage-local result):
+    cum=  500000 [    static500k] stop= 503808 d%=  +3.21% within=YES
+  seed 300 stage chain (nominal cumulative -> per-stage-local result):
+    cum=  500000 [    static500k] stop= 503808 d%=  +2.65% within=YES
+    cum=  750000 [    resume750k] stop= 253952 d%=  +6.27% within=no
+    cum= 1000000 [ ext100M(stg1)] stop= 253952 d%=  +1.75% within=YES
+
+  alignment markers (union of all seeds' stage-end cumulative totals): [500000, 750000, 1000000, 1250000, 1500000]
+  cum=  500000: mean|d%|=3.372%  within=4/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+  cum=  750000: mean|d%|=2.768%  within=4/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+  cum= 1000000: mean|d%|=1.864%  within=5/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+  cum= 1250000: mean|d%|=1.472%  within=5/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+  cum= 1500000: mean|d%|=1.501%  within=5/5 (need>=4)  skip=0 undefined=0  -> CONVERGED
+
+Written: /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/analysis/y_reward_stage_2026-08-19/n30_per_stage.csv, n60_per_stage.csv, n90_per_marker.csv
+
+==========================================================================================
+SUMMARY
+==========================================================================================
+N=30: earliest durable-converged stage = stage 1 of 1 tested
+N=60: earliest durable-converged stage = stage 3 of 7 tested
+N=90: earliest durable-converged cumulative marker = 500000 of [500000, 750000, 1000000, 1250000, 1500000]
