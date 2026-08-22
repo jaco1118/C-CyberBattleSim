@@ -149,9 +149,13 @@ def band_analysis(usable, band_filter, label):
         rho, pval = float("nan"), float("nan")
 
     # --- mechanical_root_loss diagnostic: gross-loss worst decile vs rest (descriptive only) ---
+    # "rest" = remaining 90% of the POSITIVE-gross-loss population (rest_g), matching the
+    # established convention in compute_rq3d_renormalize.py ("top 10% of that positive-loss
+    # subset ... remaining 90% = rest") -- NOT the full remaining dataset including zero/negative
+    # -loss episodes. Verified against that convention: this exact definition reproduces RQ3D's
+    # own previously-reported pooled 4.16/2.58 figure (see run_output.log).
     mech_top = [r["mechanical_root_loss"] for r in top_g]
-    mech_rest_pool = [r["mechanical_root_loss"] for r in rest_g] + \
-        [r["mechanical_root_loss"] for r in rows if r["gross_root_loss"] <= 0]
+    mech_rest_pool = [r["mechanical_root_loss"] for r in rest_g]
     mech_diag = {
         "top_mean": float(np.mean(mech_top)) if mech_top else float("nan"),
         "top_median": float(np.median(mech_top)) if mech_top else float("nan"),
