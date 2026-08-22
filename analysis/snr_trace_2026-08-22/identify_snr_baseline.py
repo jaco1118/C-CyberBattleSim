@@ -94,6 +94,11 @@ def part_a_archived_episode_replay():
     near_100 = ct_df[(ct_df['n_discovered'] >= 80) & (ct_df['n_discovered'] <= 120)]
     vals = near_100['snr'].dropna().values
     mean_snr = float(np.mean(vals))
+    median_snr = float(np.median(vals))
+    print(f"\n(cross-check, not the reported statistic) MEDIAN of the same near_100 "
+          f"per-episode-median-snr values, n={len(vals)}: {median_snr:.4f} -- explains why "
+          f"SNR-ABS's own closest miss (median-based, on the correct [80,120] population) "
+          f"landed at ~0.21, inside its reported '0.12-0.21' range.")
     rng = np.random.default_rng(0)  # bootstrap_ci() itself is unseeded; CI will vary slightly
     boots = np.array([np.mean(rng.choice(vals, replace=True, size=len(vals))) for _ in range(10000)])
     lo, hi = np.percentile(boots, [2.5, 97.5])
