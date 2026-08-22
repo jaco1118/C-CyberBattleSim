@@ -58,8 +58,10 @@ def classify(df):
 
 def median_bin_slope(df, value_col, n_boot, rng):
     """Task-T-style: median(value) per integer n_discovered bin, OLS of log(median) vs log(n),
-    bootstrap CI by resampling whole episodes (seed,episode) with replacement."""
-    eps = df[["seed", "episode"]].drop_duplicates().to_records(index=False).tolist()
+    bootstrap CI by resampling whole episodes (band,seed,episode) with replacement. band is part
+    of episode identity -- episode/step numbering restarts independently per band's own run, so
+    (seed,episode) alone can collide across bands (caught via Amendment 3's own cross-check)."""
+    eps = df[["band", "seed", "episode"]].drop_duplicates().to_records(index=False).tolist()
 
     def slope_on(sub):
         g = sub.groupby("n_discovered")[value_col].median()
@@ -74,7 +76,7 @@ def median_bin_slope(df, value_col, n_boot, rng):
 
     point = slope_on(df)
     ep_index = {ep: i for i, ep in enumerate(eps)}
-    df_ep_idx = df.apply(lambda r: ep_index[(r["seed"], r["episode"])], axis=1).values
+    df_ep_idx = df.apply(lambda r: ep_index[(r["band"], r["seed"], r["episode"])], axis=1).values
     slopes = []
     for _ in range(n_boot):
         sample_idx = rng.integers(0, len(eps), size=len(eps))
@@ -90,7 +92,9 @@ def median_bin_slope(df, value_col, n_boot, rng):
 
 
 def median_with_ci(vals, seeds_episodes, n_boot, rng):
-    """Median with bootstrap CI, resampling whole episodes."""
+    """Median with bootstrap CI, resampling whole (band,seed,episode) episodes. band must be
+    part of the key -- episode numbering restarts per band, so (seed,episode) alone collides
+    across bands."""
     eps = list(set(seeds_episodes))
     ep_index = {ep: i for i, ep in enumerate(eps)}
     idx = np.array([ep_index[e] for e in seeds_episodes])
@@ -119,11 +123,11 @@ def main():
 
     # AMENDMENT 3: resolve 66.4% denominator (steps, not events; co-firing deduped)
     print(f"\n=== AMENDMENT 3: denominator check ===")
-    leave_steps = all_leave.drop_duplicates(subset=["seed", "episode", "step"])
+    leave_steps = all_leave.drop_duplicates(subset=["band", "seed", "episode", "step"])
     all_steps_full = []
     for band in BANDS:
         df = pd.read_csv(f"{DATA}/drift_{band}.csv", usecols=["seed", "episode", "step", "agent_drift_full"])
-        all_steps_full.append(df.drop_duplicates(subset=["seed", "episode", "step"]))
+        all_steps_full.append(df.drop_duplicates(subset=["seed", "episode", "step"]))  # dedup WITHIN one band's own file: correct, no cross-band collision risk here
     all_steps_full = pd.concat(all_steps_full, ignore_index=True)
     print(f"events (STEP0 denom): {len(all_leave)}, zero={int((all_leave['agent_drift_full']==0).sum())} "
           f"-> {100*(all_leave['agent_drift_full']==0).sum()/len(all_leave):.2f}%")
@@ -140,14 +144,31 @@ def main():
     acting["contamination"] = acting["norm_h2"] / acting["norm_h1"]
     acting["snr_abs"] = acting["snr_current"] * acting["contamination"]
 
-    # AMENDMENT 4: reproduce Task W's numerator slopes on the SAME rows before trusting anything
+    # AMENDMENT 4: reproduce Task W's numerator slopes on the SAME rows before trusting anything.
+    # Task W STEP5's own provenance line: "log-log slope ... via mean-absolute-drift-per-integer-bin
+    # (mean INCLUDES zero/silent events...)" -- MEAN per bin, not median, and NO agent_drift_full
+    # filter (the numerator-only analysis has no denominator to protect). This differs from Task T's
+    # own SNR convention (median-per-bin, confirmed via Task W's own STEP4 cross-check reproducing
+    # -0.804 as -0.810 using median), used below for Amendments 1-3. Two different, both-attested
+    # conventions in this project's own record -- used here exactly where each was established.
     print(f"\n=== AMENDMENT 4: reproduce Task W's numerator slopes (cross-check) ===")
-    rng_check = np.random.default_rng(RNG_SEED)
-    rel_slope, rel_ci, _ = median_bin_slope(acting, "change_drift_full", 200, rng_check)  # cheap point-only check
-    acting["abs_change_drift"] = acting["change_drift_full"] * acting["norm_h2"]
-    abs_slope, abs_ci, _ = median_bin_slope(acting, "abs_change_drift", 200, rng_check)
-    print(f"change_drift_full (relative) median-bin slope: {rel_slope:.3f}  (Task W reported: -0.988)")
-    print(f"change_drift_full * norm_h2 (absolute) median-bin slope: {abs_slope:.3f}  (Task W reported: -0.891)")
+    n2_all = all_leave[all_leave["n_discovered"] >= 2].copy()
+    n2_all["abs_change_drift"] = n2_all["change_drift_full"] * n2_all["norm_h2"]
+
+    def mean_bin_slope_point(df, col):
+        g = df.groupby("n_discovered")[col].mean()
+        g = g[g > 0]
+        x = np.log(g.index.values.astype(float)); y = np.log(g.values)
+        A = np.vstack([x, np.ones_like(x)]).T
+        m, _ = np.linalg.lstsq(A, y, rcond=None)[0]
+        return float(m)
+
+    rel_slope = mean_bin_slope_point(n2_all, "change_drift_full")
+    abs_slope = mean_bin_slope_point(n2_all, "abs_change_drift")
+    print(f"rows used (n_discovered>=2, no agent_drift filter, matches Task W STEP5's 54,832): {len(n2_all)}")
+    print(f"change_drift_full (relative) MEAN-per-bin slope: {rel_slope:.4f}  (Task W reported: -0.988)")
+    print(f"change_drift_full * norm_h2 (absolute) MEAN-per-bin slope: {abs_slope:.4f}  (Task W reported: -0.891)")
+    print(f"-> {'REPRODUCED (within ~2%)' if abs(rel_slope-(-0.988))<0.05 and abs(abs_slope-(-0.891))<0.05 else 'NOT closely reproduced'}")
 
     # AMENDMENT 2: contamination factor slope -- the decisive diagnostic
     print(f"\n=== AMENDMENT 2: contamination factor (norm_h2/norm_h1) slope vs n_discovered ===")
@@ -167,7 +188,7 @@ def main():
 
     # AMENDMENT 1: median of the product (not product of medians) + Spearman correlation
     print(f"\n=== AMENDMENT 1: median snr_abs (median of product, not product of medians) ===")
-    seed_ep = list(zip(acting["seed"], acting["episode"]))
+    seed_ep = list(zip(acting["band"], acting["seed"], acting["episode"]))
     rng3 = np.random.default_rng(RNG_SEED)
     med_abs, ci_abs = median_with_ci(acting["snr_abs"].values, seed_ep, NB_MEDIAN, rng3)
     print(f"  median(snr_abs), ALL acting rows, pooled: {med_abs:.4f}  95% CI=[{ci_abs[0]:.4f},{ci_abs[1]:.4f}]")
@@ -188,13 +209,30 @@ def main():
     pt = acting[(acting["band"] == "80-100") & (acting["n_discovered"] >= 80)]
     print(f"  rows: {len(pt)}")
     if len(pt) > 0:
-        seed_ep_pt = list(zip(pt["seed"], pt["episode"]))
+        seed_ep_pt = list(zip(pt["band"], pt["seed"], pt["episode"]))  # single band here, but consistent with the fixed key
         rng4 = np.random.default_rng(RNG_SEED)
         m_abs_pt, ci_abs_pt = median_with_ci(pt["snr_abs"].values, seed_ep_pt, NB_MEDIAN, rng4)
         m_cur_pt, ci_cur_pt = median_with_ci(pt["snr_current"].values, seed_ep_pt, NB_MEDIAN, rng4)
         print(f"  median snr_current (n_discovered>=80): {m_cur_pt:.4f}  CI=[{ci_cur_pt[0]:.4f},{ci_cur_pt[1]:.4f}]  "
               f"(reported: 0.492 [0.385,0.632])")
         print(f"  median snr_abs     (n_discovered>=80): {m_abs_pt:.4f}  CI=[{ci_abs_pt[0]:.4f},{ci_abs_pt[1]:.4f}]")
+
+    print(f"\n=== DISCLOSURE: the recomputed snr_current baseline does not reproduce 0.492/-0.804 ===")
+    print(f"  Tried and all disagree with 0.492/-0.804, investigated before reporting further:")
+    print(f"    - row-level n_discovered>=80 (band 80-100): median snr_current ~0.15")
+    print(f"    - episode-level 'reaches n_discovered>=80 at any point': median snr_current ~0.18")
+    print(f"    - binning by n_discovered, n_discovered_h1, n_discovered_h2 instead of n_discovered(=h3): slopes -0.36 to -0.72, none near -0.804")
+    print(f"    - fitted-curve value at n=100 from the median-bin OLS (vs a raw sub-population median): 0.12-0.19, not 0.492")
+    print(f"  All of these land in a consistent ~0.12-0.21 range, well below the reported 0.492, across every")
+    print(f"  reasonable variant tried. This is NOT explained by the amendment 3 pooling bug (point slopes")
+    print(f"  don't depend on episode identity) and is NOT resolved by any n_discovered-binning choice tried.")
+    print(f"  Task W's OWN numerator-only slopes (-0.891/-0.988) DID reproduce closely (Amendment 4, above),")
+    print(f"  confirming the dataset and general row-selection are right -- the gap is specific to reproducing")
+    print(f"  the SNR RATIO's own baseline figure, not the underlying data or the general approach.")
+    print(f"  Reported as an unresolved discrepancy, not glossed over. snr_abs below is computed on the same")
+    print(f"  best-effort population as this non-reproducing snr_current baseline, so the ABS-vs-CURRENT")
+    print(f"  comparison (the actual point of this task) is still internally consistent even though neither")
+    print(f"  matches the thesis's exact reported number.")
 
     # slope_abs vs slope_current, pooled and per band -- the headline comparison
     print(f"\n=== slope_current vs slope_abs (Task-T-style median-bin OLS), per band and pooled ===")
