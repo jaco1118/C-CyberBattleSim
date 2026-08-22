@@ -1,0 +1,62 @@
+=== ROW COUNTS ===
+Total membership_leave fired events, all bands: 54854
+n_missing_field: 0
+n_zero_noise_floor (agent_drift_full==0): 36196
+n_near_zero_noise_floor (0<agent_drift_full<1e-12): 0
+acting-steps population (usable): 18658
+
+=== AMENDMENT 3: denominator check ===
+events (STEP0 denom): 54854, zero=36196 -> 65.99%
+leave-steps (co-firing deduped): 48697, zero=32231 -> 66.19%
+all-steps (every logged step, any change_type): 284454, zero=196244 -> 68.99%
+Reported thesis figure: 66.4%
+
+=== AMENDMENT 4: reproduce Task W's numerator slopes (cross-check) ===
+rows used (n_discovered>=2, no agent_drift filter, matches Task W STEP5's 54,832): 54832
+change_drift_full (relative) MEAN-per-bin slope: -1.0057  (Task W reported: -0.988)
+change_drift_full * norm_h2 (absolute) MEAN-per-bin slope: -0.9125  (Task W reported: -0.891)
+-> REPRODUCED (within ~2%)
+
+=== AMENDMENT 2: contamination factor (norm_h2/norm_h1) slope vs n_discovered ===
+  band 10-15: slope=-0.0230  95% CI=[-0.0474,-0.0045]  includes_0=False  (n_boot_ok=2000)
+  band 30-40: slope=-0.0074  95% CI=[-0.0241,-0.0018]  includes_0=False  (n_boot_ok=2000)
+  band 80-100: slope=-0.0056  95% CI=[-0.0223,-0.0051]  includes_0=False  (n_boot_ok=2000)
+  POOLED: slope=-0.0069  95% CI=[-0.0114,-0.0054]  includes_0=False
+
+  Contamination factor summary (all bands pooled): median=1.0032  p5=0.9900  p95=1.1235
+
+=== AMENDMENT 1: median snr_abs (median of product, not product of medians) ===
+  median(snr_abs), ALL acting rows, pooled: 0.3897  95% CI=[0.3693,0.4109]
+  (cross-check) median(snr_current), same rows: 0.3827  95% CI=[0.3653,0.4033]
+  (for comparison, NOT used as the result) naive product of medians: 0.3839
+  Spearman(snr_current, contamination) = -0.3460  (p=0.00e+00, n=18658)
+
+=== POINT FIGURE at n_discovered>=80 (band 80-100) ===
+  rows: 2032
+  median snr_current (n_discovered>=80): 0.1543  CI=[0.1385,0.1689]  (reported: 0.492 [0.385,0.632])
+  median snr_abs     (n_discovered>=80): 0.1546  CI=[0.1393,0.1691]
+
+=== DISCLOSURE: the recomputed snr_current baseline does not reproduce 0.492/-0.804 ===
+  Tried and all disagree with 0.492/-0.804, investigated before reporting further:
+    - row-level n_discovered>=80 (band 80-100): median snr_current ~0.15
+    - episode-level 'reaches n_discovered>=80 at any point': median snr_current ~0.18
+    - binning by n_discovered, n_discovered_h1, n_discovered_h2 instead of n_discovered(=h3): slopes -0.36 to -0.72, none near -0.804
+    - fitted-curve value at n=100 from the median-bin OLS (vs a raw sub-population median): 0.12-0.19, not 0.492
+  All of these land in a consistent ~0.12-0.21 range, well below the reported 0.492, across every
+  reasonable variant tried. This is NOT explained by the amendment 3 pooling bug (point slopes
+  don't depend on episode identity) and is NOT resolved by any n_discovered-binning choice tried.
+  Task W's OWN numerator-only slopes (-0.891/-0.988) DID reproduce closely (Amendment 4, above),
+  confirming the dataset and general row-selection are right -- the gap is specific to reproducing
+  the SNR RATIO's own baseline figure, not the underlying data or the general approach.
+  Reported as an unresolved discrepancy, not glossed over. snr_abs below is computed on the same
+  best-effort population as this non-reproducing snr_current baseline, so the ABS-vs-CURRENT
+  comparison (the actual point of this task) is still internally consistent even though neither
+  matches the thesis's exact reported number.
+
+=== slope_current vs slope_abs (Task-T-style median-bin OLS), per band and pooled ===
+     10-15: slope_current=-0.8253 [-1.0501,-0.2448]   slope_abs=-0.8479 [-1.0629,-0.2742]
+     30-40: slope_current=-0.7234 [-1.0618,-0.5258]   slope_abs=-0.7308 [-1.0706,-0.5503]
+    80-100: slope_current=-1.0262 [-1.2504,-0.1175]   slope_abs=-1.0309 [-1.2478,-0.1075]
+    POOLED: slope_current=-0.6730 [-0.7838,-0.6448]   slope_abs=-0.6864 [-0.7973,-0.6559]
+
+Written: analysis/snr_abs_2026-08-22/snr_abs_rows.csv (18658 rows)
