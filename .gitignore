@@ -56,3 +56,5 @@ cyberbattle/agents/y_robustness/calib_n60/
 cyberbattle/agents/y_robustness/calib_neighbour/
 cyberbattle/agents/y_robustness/out/
 analysis/graph_depth_2026-08-10/regression_wide/
+# rq2c replay raw output
+cyberbattle/agents/rq2c_replay/
