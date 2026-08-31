@@ -1,0 +1,11 @@
+metric='train/Root owned nodes'  window=50000  threshold=5.0%
+       run       stop       pre       fin    Delta%  within?
+    seed42     503808    30.500    30.833    +1.09%      YES
+   seed100     503808    34.167    29.417   -13.90%       no
+   seed123     503808    26.417    25.333    -4.10%      YES
+   seed200     503808    26.083    26.417    +1.28%      YES
+   seed300     253952    31.583    30.000    -5.01%       no
+
+mean|Delta%| = 5.08%  (>=5.0%)
+within-band  = 3/5  (need >= 4)
+BAND VERDICT (F4 rule): NOT CONVERGED

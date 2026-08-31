@@ -1,0 +1,4 @@
+band,n_total_episodes,n_zero_events,n_degenerate_ratio,n_included,n_fired_events_in_drift_log,n_valid_att_strength_events
+10-15,640,184,0,456,9253,6160
+30-40,1770,293,8,1469,32269,22319
+80-100,2000,318,11,1671,39488,28395

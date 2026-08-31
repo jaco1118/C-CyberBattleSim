@@ -1,0 +1,45 @@
+=== ITEM 1: forced-replay extremal figures ===
+
+--- band 10-15 ---
+  probe leave records: total=7042  batch(n_touched>1)=574  single-node=6468
+  A [including batch] departing_held_max: n_all=7042 n_discovered=2240 n_hold=1985  A_all=0.2819  A_discovered=0.8862
+  A [including batch] departing_held_min: n_all=7042 n_discovered=2240 n_hold=1966  A_all=0.2792  A_discovered=0.8777
+  A [including batch] union: n_all=7042 n_discovered=2240 n_hold=2053  A_all=0.2915  A_discovered=0.9165
+  A [excluding batch] departing_held_max: n_all=6468 n_discovered=2043 n_hold=1808  A_all=0.2795  A_discovered=0.8850
+  A [excluding batch] departing_held_min: n_all=6468 n_discovered=2043 n_hold=1794  A_all=0.2774  A_discovered=0.8781
+  A [excluding batch] union: n_all=6468 n_discovered=2043 n_hold=1870  A_all=0.2891  A_discovered=0.9153
+  target A=0.89  A_all(union)=0.2915 (diff -0.5985)  A_discovered(union)=0.9165 (diff +0.0265)
+  batch-inclusion difference: A_all delta=0.0024  A_discovered delta=0.0012
+  JOIN: probe_records_in=7042  drift_rows_in=169702  matched=7042  unmatched=0 (0.00%)
+  B [max]: held=1985  nan_excluded=54  moved=1930  n_evaluated=1931  B=0.9995
+  B [min]: held=1966  nan_excluded=52  moved=1913  n_evaluated=1914  B=0.9995
+
+--- band 30-40 ---
+  probe leave records: total=27066  batch(n_touched>1)=2537  single-node=24529
+  A [including batch] departing_held_max: n_all=27066 n_discovered=6941 n_hold=4229  A_all=0.1562  A_discovered=0.6093
+  A [including batch] departing_held_min: n_all=27066 n_discovered=6941 n_hold=3960  A_all=0.1463  A_discovered=0.5705
+  A [including batch] union: n_all=27066 n_discovered=6941 n_hold=4688  A_all=0.1732  A_discovered=0.6754
+  A [excluding batch] departing_held_max: n_all=24529 n_discovered=6179 n_hold=3778  A_all=0.1540  A_discovered=0.6114
+  A [excluding batch] departing_held_min: n_all=24529 n_discovered=6179 n_hold=3531  A_all=0.1440  A_discovered=0.5715
+  A [excluding batch] union: n_all=24529 n_discovered=6179 n_hold=4182  A_all=0.1705  A_discovered=0.6768
+  target A=0.61  A_all(union)=0.1732 (diff -0.4368)  A_discovered(union)=0.6754 (diff +0.0654)
+  batch-inclusion difference: A_all delta=0.0027  A_discovered delta=0.0014
+  JOIN: probe_records_in=27066  drift_rows_in=639556  matched=27066  unmatched=0 (0.00%)
+  B [max]: held=4229  nan_excluded=123  moved=4099  n_evaluated=4106  B=0.9983
+  B [min]: held=3960  nan_excluded=106  moved=3843  n_evaluated=3854  B=0.9971
+
+--- band 80-100 ---
+  probe leave records: total=32253  batch(n_touched>1)=3050  single-node=29203
+  A [including batch] departing_held_max: n_all=32253 n_discovered=10872 n_hold=3741  A_all=0.1160  A_discovered=0.3441
+  A [including batch] departing_held_min: n_all=32253 n_discovered=10872 n_hold=2428  A_all=0.0753  A_discovered=0.2233
+  A [including batch] union: n_all=32253 n_discovered=10872 n_hold=4321  A_all=0.1340  A_discovered=0.3974
+  A [excluding batch] departing_held_max: n_all=29203 n_discovered=9730 n_hold=3361  A_all=0.1151  A_discovered=0.3454
+  A [excluding batch] departing_held_min: n_all=29203 n_discovered=9730 n_hold=2185  A_all=0.0748  A_discovered=0.2246
+  A [excluding batch] union: n_all=29203 n_discovered=9730 n_hold=3889  A_all=0.1332  A_discovered=0.3997
+  target A=0.34  A_all(union)=0.1340 (diff -0.2060)  A_discovered(union)=0.3974 (diff +0.0574)
+  batch-inclusion difference: A_all delta=0.0008  A_discovered delta=0.0022
+  JOIN: probe_records_in=32253  drift_rows_in=827558  matched=32253  unmatched=0 (0.00%)
+  B [max]: held=3741  nan_excluded=91  moved=3648  n_evaluated=3650  B=0.9995
+  B [min]: held=2428  nan_excluded=55  moved=2361  n_evaluated=2373  B=0.9949
+
+Done.

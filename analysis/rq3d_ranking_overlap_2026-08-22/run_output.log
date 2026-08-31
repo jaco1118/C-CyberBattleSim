@@ -1,0 +1,56 @@
+Loaded 1800 change-arm episodes, 1200 static-arm episodes, from commit 3d8c9aa (attenuation-pooling-scale), read-only via git show.
+
+Usable change episodes (valid static pairing): 1800 / 1800 (excluded, no matching static-arm episode: 0)
+
+====================================================================================================
+PER-BAND RESULTS
+====================================================================================================
+
+--- band 10-15 ---
+n_usable=600
+gross_root_loss: n_positive=596 n_zero=0 n_negative=4 -> worst decile n=60, loss-share=18.2%  (historical: 18%, diff=+0.2pp)
+behavioural_residual: n_positive=509 n_zero=8 n_negative=83 -> worst decile n=51, residual-share=24.2%
+overlap: |gross|=60 |behav|=51 |intersection|=21 |union|=90 Jaccard=0.233
+  65.0% of gross-loss worst decile EXITS under behavioural ranking
+  58.8% of behavioural worst decile was NOT in gross-loss worst decile
+Spearman(gross_root_loss, behavioural_residual): rho=0.6305 p=8.091e-68 (n=600)
+mechanical_root_loss diagnostic (descriptive only): gross-worst-decile mean=2.450 median=2.000 (n=60) | rest mean=1.461 median=1.000 (n=536)
+
+--- band 30-40 ---
+n_usable=600
+gross_root_loss: n_positive=587 n_zero=1 n_negative=12 -> worst decile n=59, loss-share=18.9%  (historical: 32%, diff=-13.1pp)
+behavioural_residual: n_positive=432 n_zero=6 n_negative=162 -> worst decile n=44, residual-share=29.5%
+overlap: |gross|=59 |behav|=44 |intersection|=27 |union|=76 Jaccard=0.355
+  54.2% of gross-loss worst decile EXITS under behavioural ranking
+  38.6% of behavioural worst decile was NOT in gross-loss worst decile
+Spearman(gross_root_loss, behavioural_residual): rho=0.7373 p=5.984e-104 (n=600)
+mechanical_root_loss diagnostic (descriptive only): gross-worst-decile mean=4.831 median=5.000 (n=59) | rest mean=4.150 median=4.000 (n=528)
+
+--- band 80-100 ---
+n_usable=600
+gross_root_loss: n_positive=435 n_zero=2 n_negative=163 -> worst decile n=44, loss-share=27.7%  (historical: 34%, diff=-6.3pp)
+behavioural_residual: n_positive=316 n_zero=7 n_negative=277 -> worst decile n=32, residual-share=32.2%
+overlap: |gross|=44 |behav|=32 |intersection|=26 |union|=50 Jaccard=0.520
+  40.9% of gross-loss worst decile EXITS under behavioural ranking
+  18.8% of behavioural worst decile was NOT in gross-loss worst decile
+Spearman(gross_root_loss, behavioural_residual): rho=0.9272 p=3.504e-257 (n=600)
+mechanical_root_loss diagnostic (descriptive only): gross-worst-decile mean=2.727 median=3.000 (n=44) | rest mean=2.297 median=2.000 (n=391)
+
+====================================================================================================
+POOLED (all 3 bands) -- reported for transparency, flagged per the known scale confound
+====================================================================================================
+n_usable=1800
+gross_root_loss worst decile (n=162) band composition: {'10-15': 0, '30-40': 109, '80-100': 53}
+behavioural_residual worst decile (n=126) band composition: {'10-15': 0, '30-40': 56, '80-100': 70}
+All 3 bands represented in BOTH pooled worst deciles? False
+-> POOLED RANKING IS NOT STATISTICALLY APPROPRIATE: at least one band is unrepresented (or near-zero) in a pooled worst-decile set, reproducing the exact scale confound evidence_taskRQ3D.md already found for the pooled raw-loss ranking. Per-band results above are the primary, trustworthy view; the pooled numbers below are shown ONLY to make the confound visible, not as a usable additional result.
+[shown regardless, for completeness] pooled gross-loss-share=24.2%  behav-residual-share=33.0%  Jaccard=0.455  exits=44.4%  new=28.6%  Spearman rho=0.7606 p=0  mech diag top mean=4.160 median=4.000 (n=162) | rest mean=2.576 median=2.000 (n=1456)
+
+====================================================================================================
+STEP 7: reproduce/check the existing 2.19-vs-2.45 result (Addendum 7, compute_rq3d_behavioural_residual.py)
+====================================================================================================
+Exact original construction: POOLED across all 3 bands, rank usable positive-residual episodes by behavioural_residual descending, worst decile vs rest, compare mean root_owned_departures (== mechanical_root_loss) between the two groups.
+Reproduced: top-decile (n=126) mean departures=2.190  rest (n=1131) mean departures=2.451  diff=-0.260 95% CI [-0.549, +0.041]
+Originally reported: top=2.19, rest=2.45 (CI [-0.549,+0.041], NOT resolved).
+
+Done.

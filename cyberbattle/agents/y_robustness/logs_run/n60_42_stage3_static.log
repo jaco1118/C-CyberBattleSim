@@ -1,0 +1,3 @@
+/cs/student/project_msc/2025/sec/slchan/conda_envs/ccbs/lib/python3.10/site-packages/torch_geometric/utils/convert.py:278: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:253.)
+  data_dict[key] = torch.as_tensor(value)
+[F2 static seed42 topo./graphs_yN60_s42_2026-08-03_17-15-34/1 eval=static] episodes=200 mean=0.5249 median=0.5625 frac0=0.065 max=0.8125 -> /cs/student/project_msc/2025/sec/slchan/C-CyberBattleSim/cyberbattle/agents/y_robustness/out/n60_stage3/score_static_seed42_evalstatic.csv

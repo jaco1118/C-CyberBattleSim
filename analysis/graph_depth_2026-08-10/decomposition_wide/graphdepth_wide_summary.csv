@@ -1,0 +1,4 @@
+band,n_total_events,n_batch_excluded,n_single_node,n_coverage_fail,n_no_survivors,n_Nle1,n_direct_zero_Ngt1,n_used_for_ratio,median_N_used,median_N_all_single,prop_median,direct_median,ratio_median,ratio_mean,frac_prop_gt_direct,n_distinct_episodes,n_distinct_seeds
+10-15,1437,76,1361,0,0,0,0,1361,7.0,7.0,0.0,0.11950999399976307,0.0,0.8565082480863639,0.2432035268185158,200,5
+30-40,1923,415,1508,0,0,0,0,1508,25.0,25.0,0.0,0.03152428563281755,0.0,0.9513236364663739,0.27851458885941643,150,5
+80-100,3591,772,2819,0,0,0,0,2819,73.0,73.0,0.0,0.00849829716471358,0.0,0.3567160513334643,0.12344803121674353,220,5

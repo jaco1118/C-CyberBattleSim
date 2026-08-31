@@ -26,3 +26,35 @@ cyberbattle/data_generation/config/auth.yaml
 # (see the header note in the file itself for why)
 dissertation_log.md
 dissertation_log_v2.md
+
+# macOS junk files
+.DS_Store
+._*
+
+# raw experiment output (too large / not meant for git)
+*.pkl
+*.jsonl
+*.log
+
+# specific big raw-data folders
+attenuation_gate_archive/
+cyberbattle/agents/attenuation_analysis_output/
+cyberbattle/agents/attenuation_drift_logs/
+cyberbattle/agents/attenuation_step3_logs/
+cyberbattle/agents/cx_step2_registration/
+cyberbattle/agents/cx_step2_replay/
+cyberbattle/agents/cx_step2_static/
+cyberbattle/agents/graphdepth_sweep/
+cyberbattle/agents/graphdepth_sweep_wide/
+cyberbattle/agents/o8_arm4/
+cyberbattle/agents/rq3d_data/
+cyberbattle/agents/y2_n30/
+cyberbattle/agents/y2_n50/
+cyberbattle/agents/y_n90_extend/
+cyberbattle/agents/y_robustness/calib/
+cyberbattle/agents/y_robustness/calib_n60/
+cyberbattle/agents/y_robustness/calib_neighbour/
+cyberbattle/agents/y_robustness/out/
+analysis/graph_depth_2026-08-10/regression_wide/
+# rq2c replay raw output
+cyberbattle/agents/rq2c_replay/

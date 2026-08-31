@@ -1,0 +1,20 @@
+=== REPLAY-FLAG-CLOSEOUT addendum: behavioural signature for graphdepth_sweep ===
+
+--- band 10-15 ---
+  n_rows_read=1399  n_rows_dropped_missing_col=0  n_rows_used=1399
+  n_visible=1399  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario median at leave-time: 0.7
+
+--- band 30-40 ---
+  n_rows_read=1672  n_rows_dropped_missing_col=0  n_rows_used=1672
+  n_visible=1672  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario median at leave-time: 0.7352941176470589
+
+--- band 80-100 ---
+  n_rows_read=3127  n_rows_dropped_missing_col=0  n_rows_used=3127
+  n_visible=3127  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario median at leave-time: 0.8571428571428571
+
+=== graphdepth_sweep POOLED: n_used=6198  n_visible=6198  n_not_visible=0  unknown_fraction=0.0000 ===
+
+Done.

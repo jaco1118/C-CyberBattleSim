@@ -1,0 +1,73 @@
+=== FLAG-GROUND-TRUTH: behavioural signature of allow_undiscovered_removal ===
+
+--- attenuation_drift_logs / band 10-15 ---
+  n_rows_read=5321  n_rows_dropped_missing_col=0  n_rows_used=5321
+  n_visible=5321  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.7, p5=0.4, p95=1.0
+
+--- attenuation_drift_logs / band 30-40 ---
+  n_rows_read=21445  n_rows_dropped_missing_col=0  n_rows_used=21445
+  n_visible=21445  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.7352941176470589, p5=0.4375, p95=0.9166666666666666
+
+--- attenuation_drift_logs / band 80-100 ---
+  n_rows_read=28088  n_rows_dropped_missing_col=0  n_rows_used=28088
+  n_visible=28088  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.8588235294117647, p5=0.5108695652173914, p95=0.9625
+
+=== attenuation_drift_logs POOLED: n_used=54854  n_visible=54854  n_not_visible=0  unknown_fraction=0.0000 ===
+
+--- cx_step2_registration / band 10-15 ---
+  n_rows_read=12012  n_rows_dropped_missing_col=0  n_rows_used=12012
+  n_visible=2131  n_not_visible=9881  unknown_fraction=0.8226
+  n_discovered_h2/n_scenario at leave-time: median=0.8, p5=0.5, p95=1.0
+
+--- cx_step2_registration / band 30-40 ---
+  n_rows_read=49295  n_rows_dropped_missing_col=0  n_rows_used=49295
+  n_visible=6479  n_not_visible=42816  unknown_fraction=0.8686
+  n_discovered_h2/n_scenario at leave-time: median=0.8333333333333334, p5=0.21212121212121213, p95=0.967741935483871
+
+--- cx_step2_registration / band 80-100 ---
+  n_rows_read=56035  n_rows_dropped_missing_col=0  n_rows_used=56035
+  n_visible=10174  n_not_visible=45861  unknown_fraction=0.8184
+  n_discovered_h2/n_scenario at leave-time: median=0.9090909090909091, p5=0.47368421052631576, p95=0.9759036144578314
+
+=== cx_step2_registration POOLED: n_used=117342  n_visible=18784  n_not_visible=98558  unknown_fraction=0.8399 ===
+
+--- graphdepth_sweep_wide / band 10-15 ---
+  n_rows_read=1399  n_rows_dropped_missing_col=0  n_rows_used=1399
+  n_visible=1399  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.7, p5=0.4, p95=1.0
+
+--- graphdepth_sweep_wide / band 30-40 ---
+  n_rows_read=1672  n_rows_dropped_missing_col=0  n_rows_used=1672
+  n_visible=1672  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.7352941176470589, p5=0.39727272727272733, p95=0.9375
+
+--- graphdepth_sweep_wide / band 80-100 ---
+  n_rows_read=3127  n_rows_dropped_missing_col=0  n_rows_used=3127
+  n_visible=3127  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.8571428571428571, p5=0.475, p95=0.9529411764705882
+
+=== graphdepth_sweep_wide POOLED: n_used=6198  n_visible=6198  n_not_visible=0  unknown_fraction=0.0000 ===
+
+--- rq2c_replay / band 10-15 ---
+  n_rows_read=5101  n_rows_dropped_missing_col=0  n_rows_used=5101
+  n_visible=5101  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.7, p5=0.4, p95=1.0
+
+--- rq2c_replay / band 30-40 ---
+  n_rows_read=1651  n_rows_dropped_missing_col=0  n_rows_used=1651
+  n_visible=1651  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.7333333333333333, p5=0.4444444444444444, p95=0.9166666666666666
+
+--- rq2c_replay / band 80-100 ---
+  n_rows_read=2962  n_rows_dropped_missing_col=0  n_rows_used=2962
+  n_visible=2962  n_not_visible=0  unknown_fraction=0.0000
+  n_discovered_h2/n_scenario at leave-time: median=0.8588235294117647, p5=0.5125, p95=0.963855421686747
+
+=== rq2c_replay POOLED: n_used=9714  n_visible=9714  n_not_visible=0  unknown_fraction=0.0000 ===
+
+n_cells_undefined (no events): 0
+
+Done.

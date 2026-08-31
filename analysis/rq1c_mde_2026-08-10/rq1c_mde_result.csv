@@ -1,0 +1,3 @@
+comparison,group_a,group_b,pooled_n,mde_robustness_units,mde_pct_of_n30_mean,reported_point_diff,reported_ci_lo,reported_ci_hi,abs_point_over_mde
+node_count,N30(n=5),N90(n=5),10,0.0326,4.62,-0.022,-0.0574,0.0117,0.675
+neighbour_count,high-degree N30(n=5),low-degree N30(n=4),9,0.0471,6.67,0.0168,-0.0409,0.0743,0.357

@@ -1,0 +1,2 @@
+agent_cond,seed,eval_cond,scenario_id,topology_id,episode,root_owned,reachable,n_discovered,won,score
+static,100,static,._graphs_yN30_s100_2026-08-05_21-16-40_1,./graphs_yN30_s100_2026-08-05_21-16-40/1,0,14,23,30,0,0.6086956521739131

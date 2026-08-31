@@ -1,0 +1,53 @@
+=== Q2: absolute values, metric='train/Root owned nodes', window=50000, stop=250000 ===
+
+  band   10-15  seed   42  pre=    2.5833  fin=    2.7692  abs_diff=  +0.1859  delta%=            +7.20%  (npre=12, nfin=13)
+  band   10-15  seed  100  pre=    2.3333  fin=    2.8462  abs_diff=  +0.5128  delta%=           +21.98%  (npre=12, nfin=13)
+  band   10-15  seed  123  pre=    2.6667  fin=    2.5385  abs_diff=  -0.1282  delta%=            -4.81%  (npre=12, nfin=13)
+  band   10-15  seed  200  pre=    2.4167  fin=    3.3077  abs_diff=  +0.8910  delta%=           +36.87%  (npre=12, nfin=13)
+  band   10-15  seed  300  pre=    2.6667  fin=    2.6154  abs_diff=  -0.0513  delta%=            -1.92%  (npre=12, nfin=13)
+  band   30-40  seed   42  pre=   16.7500  fin=   16.6923  abs_diff=  -0.0577  delta%=            -0.34%  (npre=12, nfin=13)
+  band   30-40  seed  100  pre=   16.8333  fin=   13.7692  abs_diff=  -3.0641  delta%=           -18.20%  (npre=12, nfin=13)
+  band   30-40  seed  123  pre=   15.0833  fin=   15.7692  abs_diff=  +0.6859  delta%=            +4.55%  (npre=12, nfin=13)
+  band   30-40  seed  200  pre=   15.7500  fin=   16.2308  abs_diff=  +0.4808  delta%=            +3.05%  (npre=12, nfin=13)
+  band   30-40  seed  300  pre=   15.6667  fin=   15.6154  abs_diff=  -0.0513  delta%=            -0.33%  (npre=12, nfin=13)
+  band  80-100  seed   42  pre=   19.5000  fin=   24.1538  abs_diff=  +4.6538  delta%=           +23.87%  (npre=12, nfin=13)
+  band  80-100  seed  100  pre=   26.2500  fin=   26.6923  abs_diff=  +0.4423  delta%=            +1.68%  (npre=12, nfin=13)
+  band  80-100  seed  123  pre=   21.8333  fin=   25.2308  abs_diff=  +3.3974  delta%=           +15.56%  (npre=12, nfin=13)
+  band  80-100  seed  200  pre=   28.8333  fin=   25.9231  abs_diff=  -2.9103  delta%=           -10.09%  (npre=12, nfin=13)
+  band  80-100  seed  300  pre=   18.2500  fin=   27.0769  abs_diff=  +8.8269  delta%=           +48.37%  (npre=12, nfin=13)
+
+=== Q6: readability ===
+  readable (both windows non-empty): 15/15
+  unreadable: 0/15
+  seeds with pre==0 (undefined ratio, counted not epsilon-floored): 0
+
+=== Q3: per-band aggregates (absolute values) ===
+  band 10-15:
+    smallest earlier-window mean across 5 seeds: 2.3333 nodes
+    median earlier-window mean across 5 seeds:   2.5833 nodes
+    median absolute difference across 5 seeds:   +0.1859 nodes
+    1 node / median earlier-window mean = 38.71%
+    1 node / smallest earlier-window mean = 42.86%
+  band 30-40:
+    smallest earlier-window mean across 5 seeds: 15.0833 nodes
+    median earlier-window mean across 5 seeds:   15.7500 nodes
+    median absolute difference across 5 seeds:   -0.0513 nodes
+    1 node / median earlier-window mean = 6.35%
+    1 node / smallest earlier-window mean = 6.63%
+  band 80-100:
+    smallest earlier-window mean across 5 seeds: 18.2500 nodes
+    median earlier-window mean across 5 seeds:   21.8333 nodes
+    median absolute difference across 5 seeds:   +3.3974 nodes
+    1 node / median earlier-window mean = 4.58%
+    1 node / smallest earlier-window mean = 5.48%
+
+=== Q4: node-count needed for exactly 5% tolerance, band 10-15 ===
+  median earlier-window mean, band 10-15: 2.5833 nodes
+  nodes needed to hit exactly 5% at the median earlier-window mean: 0.1292
+  smallest earlier-window mean, band 10-15 (worst case): 2.3333 nodes
+  nodes needed to hit exactly 5% at the smallest earlier-window mean: 0.1167
+    seed 42: pre=2.5833  nodes-for-5%=0.1292
+    seed 100: pre=2.3333  nodes-for-5%=0.1167
+    seed 123: pre=2.6667  nodes-for-5%=0.1333
+    seed 200: pre=2.4167  nodes-for-5%=0.1208
+    seed 300: pre=2.6667  nodes-for-5%=0.1333

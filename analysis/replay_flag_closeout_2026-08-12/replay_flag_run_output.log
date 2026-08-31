@@ -1,0 +1,20 @@
+=== REPLAY-FLAG-CLOSEOUT: behavioural signature for cx_step2_replay ===
+
+--- band 10-15 ---
+  n_rows_read=12012  n_rows_dropped_missing_col=0  n_rows_used=12012
+  n_visible=2131  n_not_visible=9881  unknown_fraction=0.8226  (incl.-missing-in-denom variant: 0.8226)
+  n_discovered_h2/n_scenario at leave-time: median=0.8, p5=0.5, p95=1.0
+
+--- band 30-40 ---
+  n_rows_read=49295  n_rows_dropped_missing_col=0  n_rows_used=49295
+  n_visible=6479  n_not_visible=42816  unknown_fraction=0.8686  (incl.-missing-in-denom variant: 0.8686)
+  n_discovered_h2/n_scenario at leave-time: median=0.8333333333333334, p5=0.21212121212121213, p95=0.967741935483871
+
+--- band 80-100 ---
+  n_rows_read=56035  n_rows_dropped_missing_col=0  n_rows_used=56035
+  n_visible=10174  n_not_visible=45861  unknown_fraction=0.8184  (incl.-missing-in-denom variant: 0.8184)
+  n_discovered_h2/n_scenario at leave-time: median=0.9090909090909091, p5=0.47368421052631576, p95=0.9759036144578314
+
+=== cx_step2_replay POOLED: n_used=117342  n_visible=18784  n_not_visible=98558  unknown_fraction=0.8399 ===
+
+Done.

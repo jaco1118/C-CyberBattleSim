@@ -1,0 +1,56 @@
+data_presence_probability_range:
+- 0.2
+- 0.8
+exploit_detection_probability_range:
+- 0
+- 0
+firewall_rule_incoming_probability_range:
+- 0
+- 0
+firewall_rule_outgoing_probability_range:
+- 0
+- 0
+homogeneity_range:
+- 0.1
+- 0.1
+knows_neighbor_probability_range:
+- 0.2
+- 0.8
+max_services_per_category:
+  ics: 1
+  routers: 1
+min_presence_each_category: 0.05
+minimum_access_connectivity_threshold: 0.5
+minimum_dos_connectivity_threshold: 0.5
+minimum_knows_connectivity_threshold: 0.5
+need_to_escalate_probability_range:
+- 0.2
+- 0.8
+num_graphs: 1
+num_nodes_range:
+- 30
+- 30
+num_services_range:
+- 1
+- 2
+partial_visibility_probability_range:
+- 0.2
+- 0.8
+percentages:
+- ics: 0.37740898610555407
+  iot: 0.05637095247905561
+  routers: 0.10114061996290229
+  unix: 0.10248328992633025
+  windows: 0.3625961515261579
+probing_detection_probability_range:
+- 0
+- 0
+service_shutdown_probability_range:
+- 0
+- 0
+success_rate_probability_range:
+- 0.6
+- 1
+value_range:
+- 1
+- 100

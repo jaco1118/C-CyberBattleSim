@@ -1,0 +1,26 @@
+=== Q1.6: reconciliation check ===
+
+--- band 10-15 ---
+  rows=187647  episodes=750  steps=178226  attributed_rows=8193  retained(immediate+attributed)=13514
+--- band 30-40 ---
+  rows=640230  episodes=1910  steps=574910  attributed_rows=60387  retained(immediate+attributed)=81832
+--- band 80-100 ---
+  rows=775122  episodes=2000  steps=602000  attributed_rows=167365  retained(immediate+attributed)=195453
+
+=== totals ===
+  episodes=4660 (thesis: 4,660)
+  rows=1602999 (thesis: 1,602,999)
+  steps=1355136 (thesis: 1,355,136)
+  retained (event_phase in immediate/attributed)=290799 (thesis: 290,799)
+  attributed-only rows=235945
+
+  rows - steps = 1602999 - 1355136 = 247863  (thesis: 247,863)
+  attributed rows alone = 235945  (does attributed_rows == rows-steps excess? False)
+
+  retained/episodes = 290799/4660 = 62.4032  (thesis: 290,799/4,660 = 62.4)
+
+=== per-band episode split (1.4) ===
+  10-15: 750
+  30-40: 1910
+  80-100: 2000
+  80-100 == 5 seeds x 400 episode budget? 2000 == 2000: True

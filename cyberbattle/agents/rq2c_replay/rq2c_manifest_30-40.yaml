@@ -1,0 +1,14 @@
+bands:
+  30-40:
+    checkpoint_glob: checkpoints/1/checkpoint_*_steps.zip
+    run_folders:
+    - logs/trpo_250k_tuned_compressed_band30-40_seed42_2026-07-26_12-47-19/TRPO_x_control_SecureBERT
+    - logs/trpo_250k_tuned_compressed_band30-40_seed100_2026-07-26_13-04-57/TRPO_x_control_SecureBERT
+    - logs/trpo_250k_tuned_compressed_band30-40_seed123_2026-07-26_13-21-32/TRPO_x_control_SecureBERT
+    - logs/trpo_250k_tuned_compressed_band30-40_seed200_2026-07-26_13-38-29/TRPO_x_control_SecureBERT
+    - logs/trpo_250k_tuned_compressed_band30-40_seed300_2026-07-26_13-55-49/TRPO_x_control_SecureBERT
+    topology_source_folder: scalability_30_40
+max_episodes_per_band: 400
+n_topologies_per_band: 8
+switch_interval_episodes: 5
+target_relevant_events_per_change_type: 200

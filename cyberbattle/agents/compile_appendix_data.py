@@ -43,18 +43,18 @@ DET_CSV_PATTERNS = {
         300: f"{LOGS}/local_static_5seed_2026-07-18_01-15-51/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*100_0_2026071[89]*.csv",
     },
     "compressed_dynamic": {
-        42: f"{LOGS}/compressed_dynamic_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*100_0_2026071[89]*.csv",
-        100: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*100_0_2026071[89]*.csv",
-        123: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2/average_performances_*100_0_2026071[89]*.csv",
-        200: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3/average_performances_*100_0_2026071[89]*.csv",
-        300: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*100_0_2026071[89]*.csv",
+        42: f"{LOGS}/[useless but backup] compressed_dynamic_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*100_0_2026071[89]*.csv",
+        100: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*100_0_2026071[89]*.csv",
+        123: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2/average_performances_*100_0_2026071[89]*.csv",
+        200: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3/average_performances_*100_0_2026071[89]*.csv",
+        300: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*100_0_2026071[89]*.csv",
     },
     "compressed_static": {
-        42: f"{LOGS}/compressed_static_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*100_0_2026071[89]*.csv",
-        100: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*100_0_2026071[89]*.csv",
-        123: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2/average_performances_*100_0_2026071[89]*.csv",
-        200: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3/average_performances_*100_0_2026071[89]*.csv",
-        300: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*100_0_2026071[89]*.csv",
+        42: f"{LOGS}/[useless but backup] compressed_static_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*100_0_2026071[89]*.csv",
+        100: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1/average_performances_*100_0_2026071[89]*.csv",
+        123: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2/average_performances_*100_0_2026071[89]*.csv",
+        200: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3/average_performances_*100_0_2026071[89]*.csv",
+        300: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4/average_performances_*100_0_2026071[89]*.csv",
     },
 }
 
@@ -74,18 +74,18 @@ TRAIN_AUC_DIRS = {
         300: f"{LOGS}/local_static_5seed_2026-07-18_01-15-51/TRPO_x_control_SecureBERT/TRPO_4",
     },
     "compressed_dynamic": {
-        42: f"{LOGS}/compressed_dynamic_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/PPO_1",
-        100: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/PPO_1",
-        123: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/PPO_2",
-        200: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/PPO_3",
-        300: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/PPO_4",
+        42: f"{LOGS}/[useless but backup] compressed_dynamic_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/PPO_1",
+        100: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/PPO_1",
+        123: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/PPO_2",
+        200: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/PPO_3",
+        300: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/PPO_4",
     },
     "compressed_static": {
-        42: f"{LOGS}/compressed_static_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/PPO_1",
-        100: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/PPO_1",
-        123: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/PPO_2",
-        200: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/PPO_3",
-        300: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/PPO_4",
+        42: f"{LOGS}/[useless but backup] compressed_static_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/PPO_1",
+        100: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/PPO_1",
+        123: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/PPO_2",
+        200: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/PPO_3",
+        300: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/PPO_4",
     },
 }
 
@@ -105,18 +105,18 @@ TEST_AUC_DIRS = {
         300: f"{LOGS}/local_static_5seed_2026-07-18_01-15-51/TRPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4",
     },
     "compressed_dynamic": {
-        42: f"{LOGS}/compressed_dynamic_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1",
-        100: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1",
-        123: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2",
-        200: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3",
-        300: f"{LOGS}/compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4",
+        42: f"{LOGS}/[useless but backup] compressed_dynamic_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1",
+        100: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1",
+        123: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2",
+        200: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3",
+        300: f"{LOGS}/[useless but backup] compressed_dynamic_5seed_2026-07-18_01-09-06/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4",
     },
     "compressed_static": {
-        42: f"{LOGS}/compressed_static_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1",
-        100: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1",
-        123: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2",
-        200: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3",
-        300: f"{LOGS}/compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4",
+        42: f"{LOGS}/[useless but backup] compressed_static_seed42_ppo_2026-07-18_14-52-50/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1",
+        100: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/1",
+        123: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/2",
+        200: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/3",
+        300: f"{LOGS}/[useless but backup] compressed_static_5seed_2026-07-18_01-15-51/PPO_x_control_SecureBERT/test/local_baseline_single_topology/train/4",
     },
 }
 
@@ -172,9 +172,13 @@ def build_checkpoint_curves_table():
         rep, churn = CONDITION_META[cond_name]
         for seed, pattern in seed_paths.items():
             full_pattern = pattern if os.path.isabs(pattern) else os.path.join(BASE_DIR, pattern)
-            dirs = sorted(glob.glob(full_pattern))
+            # TEST_AUC_DIRS values are literal directories (no wildcards), but some run
+            # directories now contain literal "[...]" (backup-tag rename), which glob.glob()
+            # would otherwise interpret as character-class syntax rather than literal text --
+            # glob.escape() the fixed path so it matches literally.
+            dirs = sorted(glob.glob(glob.escape(full_pattern)))
             run_dir = sorted(dirs, key=os.path.getmtime)[-1]
-            csv_paths = glob.glob(os.path.join(run_dir, "average_performances_*.csv"))
+            csv_paths = glob.glob(os.path.join(glob.escape(run_dir), "average_performances_*.csv"))
             csv_paths.sort(key=os.path.getmtime)
             for idx, csv_path in enumerate(csv_paths):
                 df = pd.read_csv(csv_path)

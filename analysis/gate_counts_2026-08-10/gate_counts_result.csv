@@ -1,0 +1,5 @@
+band,ml_total,ml_attributed,ml_undiscovered,ml_other_visibility_value,frac_attributed,undisc_nan,undisc_has_value,frac_nan,valued_zero,valued_nonzero,frac_zero_of_valued,single_group_n,single_group_nonzero,single_group_nonzero_rate,multi_group_n,multi_group_nonzero,multi_group_nonzero_rate,max_nonzero_drift
+10-15,12012,2131,9881,0,0.1774,4970,4911,0.503,4480,431,0.9122,177,0,0.0,4734,431,0.091044,0.7813
+30-40,49295,6479,42816,0,0.1314,22229,20587,0.5192,18586,2001,0.9028,348,0,0.0,20239,2001,0.098869,0.9387
+80-100,56035,10174,45861,0,0.1816,23782,22079,0.5186,19680,2399,0.8913,307,0,0.0,21772,2399,0.110187,0.5042
+POOLED,117342,18784,98558,0,0.1601,50981,47577,0.5173,42746,4831,0.8985,832,0,0.0,46745,4831,0.103348,0.9387

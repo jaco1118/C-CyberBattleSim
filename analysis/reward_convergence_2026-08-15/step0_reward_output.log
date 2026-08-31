@@ -1,0 +1,45 @@
+=== Q1/Q2/Q6: metric='rollout/ep_rew_mean', window=50000, --stop defaults to each file's own max ===
+
+  a-manifest     10-15        seed=42   stop=  253952 min=1153.7917 max=3430.5908  pre=2700.1372 fin=2356.1477 abs_diff=-343.9895  delta%=             -12.74%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     10-15        seed=100  stop=  253952 min=1184.5203 max=3798.1978  pre=2716.4313 fin=2688.3952 abs_diff= -28.0361  delta%=              -1.03%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     10-15        seed=123  stop=  253952 min= 820.2946 max=3370.1731  pre=2151.6089 fin=2756.3664 abs_diff=+604.7575  delta%=             +28.11%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     10-15        seed=200  stop=  253952 min= 999.4945 max=3550.5310  pre=2547.3291 fin=2157.7184 abs_diff=-389.6107  delta%=             -15.29%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     10-15        seed=300  stop=  253952 min=1495.8541 max=3859.2295  pre=3256.6205 fin=2920.8777 abs_diff=-335.7428  delta%=             -10.31%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     30-40        seed=42   stop=  253952 min=5314.1235 max=12793.3027  pre=10873.9720 fin=11907.2277 abs_diff=+1033.2557  delta%=              +9.50%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     30-40        seed=100  stop=  253952 min=5278.6743 max=12208.7881  pre=9369.2712 fin=10054.2642 abs_diff=+684.9930  delta%=              +7.31%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     30-40        seed=123  stop=  253952 min=6272.0186 max=11510.3125  pre=9225.3746 fin=8985.7362 abs_diff=-239.6384  delta%=              -2.60%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     30-40        seed=200  stop=  253952 min=5345.4058 max=12065.4307  pre=8271.6598 fin=9524.6761 abs_diff=+1253.0163  delta%=             +15.15%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     30-40        seed=300  stop=  253952 min=2207.9695 max=11791.7783  pre=11596.4040 fin=8502.2887 abs_diff=-3094.1153  delta%=             -26.68%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     80-100       seed=42   stop=  253952 min=5682.5913 max=15007.1143  pre=12717.4691 fin=13457.3838 abs_diff=+739.9147  delta%=              +5.82%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     80-100       seed=100  stop=  253952 min=5338.8687 max=17933.3379  pre=13304.0093 fin=15435.7769 abs_diff=+2131.7676  delta%=             +16.02%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     80-100       seed=123  stop=  253952 min=5467.3926 max=17937.5898  pre=12670.7906 fin=15622.2813 abs_diff=+2951.4907  delta%=             +23.29%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     80-100       seed=200  stop=  253952 min=7095.4385 max=16355.7891  pre=14189.6462 fin=14321.5649 abs_diff=+131.9188  delta%=              +0.93%  (npre=12, nfin=12, n_total_points=62)
+  a-manifest     80-100       seed=300  stop=  253952 min=3411.4026 max=16218.2695  pre=12690.5721 fin=15183.8311 abs_diff=+2493.2590  delta%=             +19.65%  (npre=12, nfin=12, n_total_points=62)
+  b-N30          N30          seed=42   stop=  253952 min=3806.0718 max=8631.6738  pre=8371.4415 fin=8526.7901 abs_diff=+155.3486  delta%=              +1.86%  (npre=12, nfin=12, n_total_points=62)
+  b-N30          N30          seed=100  stop=  253952 min=3995.1714 max=9555.8838  pre=9174.1439 fin=9415.8551 abs_diff=+241.7112  delta%=              +2.63%  (npre=12, nfin=12, n_total_points=62)
+  b-N30          N30          seed=123  stop=  253952 min=6163.8008 max=13386.3896  pre=12969.1869 fin=13121.7979 abs_diff=+152.6110  delta%=              +1.18%  (npre=12, nfin=12, n_total_points=62)
+  b-N30          N30          seed=200  stop=  253952 min=4697.2437 max=11220.6211  pre=10479.2513 fin=10645.9011 abs_diff=+166.6498  delta%=              +1.59%  (npre=12, nfin=12, n_total_points=62)
+  b-N30          N30          seed=300  stop=  253952 min=3920.3538 max=11079.4805  pre=10799.2574 fin=10660.0164 abs_diff=-139.2410  delta%=              -1.29%  (npre=12, nfin=12, n_total_points=62)
+  b-N60          N60          seed=42   stop=  253952 min=17200.0996 max=18582.5020  pre=18114.7829 fin=17829.2104 abs_diff=-285.5724  delta%=              -1.58%  (npre=12, nfin=12, n_total_points=62)
+  b-N60          N60          seed=100  stop=  253952 min=15683.9346 max=17379.2832  pre=16908.8532 fin=16918.5651 abs_diff=  +9.7119  delta%=              +0.06%  (npre=12, nfin=12, n_total_points=62)
+  b-N60          N60          seed=123  stop=  253952 min=14269.0518 max=19209.3711  pre=18858.0013 fin=18465.8901 abs_diff=-392.1112  delta%=              -2.08%  (npre=12, nfin=12, n_total_points=62)
+  b-N60          N60          seed=200  stop=  253952 min=14889.3506 max=17492.5410  pre=16636.3928 fin=16705.7747 abs_diff= +69.3819  delta%=              +0.42%  (npre=12, nfin=12, n_total_points=62)
+  b-N60          N60          seed=300  stop=  253952 min=12913.8350 max=15761.8174  pre=15232.9950 fin=15423.3756 abs_diff=+190.3805  delta%=              +1.25%  (npre=12, nfin=12, n_total_points=62)
+  b-N90          N90          seed=42   stop=  503808 min=10210.9736 max=15712.1787  pre=15035.2447 fin=15053.5640 abs_diff= +18.3193  delta%=              +0.12%  (npre=12, nfin=12, n_total_points=123)
+  b-N90          N90          seed=100  stop=  253952 min=16438.9082 max=21184.7500  pre=20914.0573 fin=20473.0711 abs_diff=-440.9862  delta%=              -2.11%  (npre=12, nfin=12, n_total_points=62)
+  b-N90          N90          seed=123  stop=  503808 min=6292.3975 max=18443.3535  pre=17833.9424 fin=17779.1818 abs_diff= -54.7606  delta%=              -0.31%  (npre=12, nfin=12, n_total_points=123)
+  b-N90          N90          seed=200  stop=  503808 min=5852.5859 max=17074.0020  pre=16274.6370 fin=16797.2782 abs_diff=+522.6411  delta%=              +3.21%  (npre=12, nfin=12, n_total_points=123)
+  b-N90          N90          seed=300  stop=  253952 min=13305.5596 max=16393.1289  pre=14782.7653 fin=15042.1226 abs_diff=+259.3573  delta%=              +1.75%  (npre=12, nfin=12, n_total_points=62)
+  c-lowdeg-N30   N30(lowdeg)  seed=42   stop=  253952 min=2814.3975 max=8113.5352  pre=7419.3202 fin=7943.3465 abs_diff=+524.0263  delta%=              +7.06%  (npre=12, nfin=12, n_total_points=62)
+  c-lowdeg-N30   N30(lowdeg)  seed=100  stop=  253952 min=4677.5361 max=9781.2549  pre=9535.5426 fin=9716.6808 abs_diff=+181.1382  delta%=              +1.90%  (npre=12, nfin=12, n_total_points=62)
+  c-lowdeg-N30   N30(lowdeg)  seed=123  stop=  253952 min=4015.0933 max=9665.0566  pre=9098.0885 fin=9421.2967 abs_diff=+323.2082  delta%=              +3.55%  (npre=12, nfin=12, n_total_points=62)
+  c-lowdeg-N30   N30(lowdeg)  seed=200  stop=  253952 min=5476.7754 max=11256.7061  pre=10756.4347 fin=10891.2603 abs_diff=+134.8256  delta%=              +1.25%  (npre=12, nfin=12, n_total_points=62)
+  c-lowdeg-N30   N30(lowdeg)  seed=300  stop=  253952 min=2843.2097 max=8337.2832  pre=7771.2658 fin=8109.2222 abs_diff=+337.9565  delta%=              +4.35%  (npre=12, nfin=12, n_total_points=62)
+
+=== summary ===
+  total (population,cell,seed) rows attempted: 35
+  readable: 35
+  unreadable: 0
+  pre negative: 0
+  pre within 1.0 of zero (and not negative): 0
+  pre safely away from zero and positive: 35

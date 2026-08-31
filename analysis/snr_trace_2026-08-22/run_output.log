@@ -1,0 +1,40 @@
+====================================================================================================
+PART A: recompute LEVEL/SLOPE from the ARCHIVED per-episode CSV of the actual 2026-07-26 gate run
+====================================================================================================
+membership_leave episode-rows (pooled across bands): 4641  (archived gate_summary.txt: n episodes = 4641)
+valid (non-NaN) snr episode-rows: 4517
+
+(cross-check, not the reported statistic) MEDIAN of the same near_100 per-episode-median-snr values, n=306: 0.2110 -- explains why SNR-ABS's own closest miss (median-based, on the correct [80,120] population) landed at ~0.21, inside its reported '0.12-0.21' range.
+
+LEVEL: mean of per-episode median-snr, n_discovered in [80,120], n=306: 0.492 [0.383, 0.632]
+       reported: 0.492 [0.385, 0.632]
+       point-estimate exact match (< 0.001): True
+
+SLOPE: unbinned log-log OLS of per-episode median-snr vs per-episode median n_discovered, all valid rows, n=4517: -0.804 [-0.842, -0.765]
+       reported: -0.804 [-0.842, -0.765]
+       point-estimate exact match (< 0.001): True; CI exact match (fit_loglog_slope's rng is seed=42, deterministic): True
+
+Archived gate_summary.txt's own printed lines (literal original output, not reconstructed):
+  LEVEL: SNR at ~100 discovered nodes (n=306 valid episode-rows in [80,120]): 0.492 [0.385, 0.632]
+  SLOPE: log-log SNR-vs-n_discovered slope = -0.804 [-0.842, -0.765] (n=4517)
+
+====================================================================================================
+PART B: the four STEP-2-prescribed candidate statistics (exactly four, no more), tested against 0.492
+====================================================================================================
+per-event rows (pooled across bands, acting-steps population), membership_leave, n_discovered in [80,120]: 2032
+
+(a) median of per-event ratio, n in [80,120]:            0.1543
+(b) mean of per-event ratio, n in [80,120]:               1.5027  (dominated by extreme low-n_discovered outliers; code comment notes observed values up to 1.86e9 -- exactly why the real code aggregates per-episode MEDIAN first, before ever taking a mean)
+(c) ratio of pooled means (mean(change_drift)/mean(agent_drift)), n in [80,120]: 0.2733
+(d) Task-W mean-per-integer-n_discovered-bin, median across ALL bins: 2.0864  (bin [90,100) alone: 2.3516)
+
+reported LEVEL: 0.492
+  a: no match (|diff|=0.3377)
+  b: no match (|diff|=1.0107)
+  c: no match (|diff|=0.2187)
+  d (median-across-bins): no match (|diff|=1.5944)
+  d (bin [90,100) only): no match (|diff|=1.8596)
+
+====================================================================================================
+0.492 AND -0.804 IDENTIFIED AS: the MEAN (bootstrap-CI'd) of per-episode MEDIAN snr values -- snr computed per membership_leave event as change_drift_full/agent_drift_full (NaN below ZERO_NOISE_FLOOR_THRESHOLD=1e-9), median-aggregated to one value per (seed, scenario_id, episode) episode within each band, then pooled (concatenated, not re-aggregated) across all three bands. LEVEL = mean of these episode-medians restricted to episodes whose own median n_discovered falls in the RANGE [80,120]. SLOPE = an UNBINNED log-log OLS (np.polyfit on log(n_discovered), log(episode-median-snr), bootstrap CI with fixed rng seed=42) over every episode with a valid (non-NaN) snr, pooled across all three bands. This is (compute_attenuation_analysis.py's own compute_episode_aggregates() + the LEVEL/SLOPE emission block near line 1063), NOT any of the four candidates named in STEP 2 -- none of which used per-episode median-first aggregation.
+====================================================================================================

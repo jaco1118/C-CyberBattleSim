@@ -1,0 +1,7 @@
+band,sweep,n_leave,n_visible,pct_visible
+10-15,graphdepth_sweep_wide,1399,1399,100.0
+10-15,cx_step2_registration,12012,2131,17.740592740592742
+30-40,graphdepth_sweep_wide,1672,1672,100.0
+30-40,cx_step2_registration,49295,6479,13.143320823612942
+80-100,graphdepth_sweep_wide,3127,3127,100.0
+80-100,cx_step2_registration,56035,10174,18.156509324529313

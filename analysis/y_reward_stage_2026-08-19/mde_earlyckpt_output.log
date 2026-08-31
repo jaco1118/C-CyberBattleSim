@@ -1,0 +1,10 @@
+N=30 (n30): mean=0.7056 sd=0.0376  per-seed={42: np.float64(0.6802372607171744), 100: np.float64(0.7685761047463175), 123: np.float64(0.6740389678778306), 200: np.float64(0.6983460225781045), 300: np.float64(0.7065568950308734)}
+N=60 (n60_stage3): mean=0.7018 sd=0.0537  per-seed={42: np.float64(0.7487596745385988), 100: np.float64(0.671033478893741), 123: np.float64(0.6750841750841752), 200: np.float64(0.6453763818213721), 300: np.float64(0.7686688311688312)}
+N=90 (n90_static500k): mean=0.6845 sd=0.0151  per-seed={42: np.float64(0.6827445652173914), 100: np.float64(0.666407947842285), 123: np.float64(0.6754826254826256), 200: np.float64(0.6924064563462949), 300: np.float64(0.7054661241818504)}
+
+N=30 vs N=60: pooled n=10, MDE=0.0437 robustness units = 6.2% of N=30 mean robustness (0.7056)
+N=30 vs N=90: pooled n=10, MDE=0.0292 robustness units = 4.1% of N=30 mean robustness (0.7056)
+N=60 vs N=90: pooled n=10, MDE=0.0383 robustness units = 5.5% of N=60 mean robustness (0.7018)
+
+Range across the three pairs: 0.029 to 0.044
+Percentage-of-mean range: 4.1% to 6.2%

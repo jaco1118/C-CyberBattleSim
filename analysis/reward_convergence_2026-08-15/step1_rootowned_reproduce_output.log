@@ -1,0 +1,59 @@
+=== recompute 'train/Root owned nodes', window=50000, --stop defaults to each file's own max ===
+
+  a-manifest     10-15        seed=42   stop=  253952  recorded=  +7.20%  recomputed=  +3.13%  diff=-4.0750pp  reproduces=NO
+  a-manifest     10-15        seed=100  stop=  253952  recorded= +21.98%  recomputed= +21.43%  diff=-0.5514pp  reproduces=NO
+  a-manifest     10-15        seed=123  stop=  253952  recorded=  -4.81%  recomputed= +10.00%  diff=+14.8100pp  reproduces=NO
+  a-manifest     10-15        seed=200  stop=  253952  recorded= +36.87%  recomputed= +25.00%  diff=-11.8700pp  reproduces=NO
+  a-manifest     10-15        seed=300  stop=  253952  recorded=  -1.92%  recomputed=  +3.33%  diff=+5.2533pp  reproduces=NO
+  a-manifest     30-40        seed=42   stop=  253952  recorded=  -0.34%  recomputed=  -0.50%  diff=-0.1600pp  reproduces=NO
+  a-manifest     30-40        seed=100  stop=  253952  recorded= -18.20%  recomputed= -23.81%  diff=-5.6095pp  reproduces=NO
+  a-manifest     30-40        seed=123  stop=  253952  recorded=  +4.55%  recomputed=  +2.16%  diff=-2.3878pp  reproduces=NO
+  a-manifest     30-40        seed=200  stop=  253952  recorded=  +3.05%  recomputed=  +2.66%  diff=-0.3904pp  reproduces=NO
+  a-manifest     30-40        seed=300  stop=  253952  recorded=  -0.33%  recomputed=  -6.67%  diff=-6.3367pp  reproduces=NO
+  a-manifest     80-100       seed=42   stop=  253952  recorded= +23.87%  recomputed= +23.28%  diff=-0.5941pp  reproduces=NO
+  a-manifest     80-100       seed=100  stop=  253952  recorded=  +1.68%  recomputed=  +1.27%  diff=-0.4102pp  reproduces=NO
+  a-manifest     80-100       seed=123  stop=  253952  recorded= +15.56%  recomputed= +13.64%  diff=-1.9236pp  reproduces=NO
+  a-manifest     80-100       seed=200  stop=  253952  recorded= -10.09%  recomputed= -10.32%  diff=-0.2252pp  reproduces=NO
+  a-manifest     80-100       seed=300  stop=  253952  recorded= +48.37%  recomputed= +51.15%  diff=+2.7821pp  reproduces=NO
+  b-N30          N30          seed=42   stop=  253952  recorded=  +4.78%  recomputed=  +4.78%  diff=+0.0047pp  reproduces=yes
+  b-N30          N30          seed=100  stop=  253952  recorded=  +8.47%  recomputed=  +8.47%  diff=+0.0046pp  reproduces=yes
+  b-N30          N30          seed=123  stop=  253952  recorded=  -1.70%  recomputed=  -1.70%  diff=-0.0021pp  reproduces=yes
+  b-N30          N30          seed=200  stop=  253952  recorded=  -1.86%  recomputed=  -1.86%  diff=-0.0005pp  reproduces=yes
+  b-N30          N30          seed=300  stop=  253952  recorded=  +4.08%  recomputed=  +4.08%  diff=+0.0016pp  reproduces=yes
+  b-N60          N60          seed=42   stop=  253952  recorded=  +1.83%  recomputed=  +1.83%  diff=+0.0049pp  reproduces=yes
+  b-N60          N60          seed=100  stop=  253952  recorded=  -9.22%  recomputed=  -9.22%  diff=-0.0019pp  reproduces=yes
+  b-N60          N60          seed=123  stop=  253952  recorded=  -2.17%  recomputed=  -2.17%  diff=-0.0039pp  reproduces=yes
+  b-N60          N60          seed=200  stop=  253952  recorded= -14.37%  recomputed= -14.37%  diff=+0.0022pp  reproduces=yes
+  b-N60          N60          seed=300  stop=  253952  recorded=  -0.92%  recomputed=  -0.92%  diff=-0.0002pp  reproduces=yes
+  b-N90          N90          seed=42   stop=  503808  recorded=  +1.09%  recomputed=  +1.09%  diff=+0.0029pp  reproduces=yes
+  b-N90          N90          seed=100  stop=  253952  recorded=  -1.25%  recomputed=  -1.25%  diff=-0.0031pp  reproduces=yes
+  b-N90          N90          seed=123  stop=  503808  recorded=  -4.10%  recomputed=  -4.10%  diff=-0.0009pp  reproduces=yes
+  b-N90          N90          seed=200  stop=  503808  recorded=  +1.28%  recomputed=  +1.28%  diff=-0.0020pp  reproduces=yes
+  b-N90          N90          seed=300  stop=  253952  recorded=  -3.15%  recomputed=  -3.15%  diff=-0.0019pp  reproduces=yes
+  c-lowdeg-N30   N30(lowdeg)  seed=42   stop=  253952  recorded=  +5.88%  recomputed=  +5.88%  diff=+0.0024pp  reproduces=yes
+  c-lowdeg-N30   N30(lowdeg)  seed=100  stop=  253952  recorded=  +3.14%  recomputed=  +3.14%  diff=+0.0014pp  reproduces=yes
+  c-lowdeg-N30   N30(lowdeg)  seed=123  stop=  253952  recorded=  +2.45%  recomputed=  +2.45%  diff=+0.0040pp  reproduces=yes
+  c-lowdeg-N30   N30(lowdeg)  seed=200  stop=  253952  recorded=  +1.44%  recomputed=  +1.44%  diff=+0.0023pp  reproduces=yes
+  c-lowdeg-N30   N30(lowdeg)  seed=300  stop=  253952  recorded=  -0.43%  recomputed=  -0.43%  diff=-0.0048pp  reproduces=yes
+
+=== summary ===
+  rows compared: 35
+  reproduces record: 20
+  does NOT reproduce: 15
+
+  MISMATCHES (do not draw conclusions from these beyond reporting them):
+    a-manifest 10-15 seed=42: recorded=+7.20% recomputed=+3.13% diff=-4.0750pp (recompute used stop=253952)
+    a-manifest 10-15 seed=100: recorded=+21.98% recomputed=+21.43% diff=-0.5514pp (recompute used stop=253952)
+    a-manifest 10-15 seed=123: recorded=-4.81% recomputed=+10.00% diff=+14.8100pp (recompute used stop=253952)
+    a-manifest 10-15 seed=200: recorded=+36.87% recomputed=+25.00% diff=-11.8700pp (recompute used stop=253952)
+    a-manifest 10-15 seed=300: recorded=-1.92% recomputed=+3.33% diff=+5.2533pp (recompute used stop=253952)
+    a-manifest 30-40 seed=42: recorded=-0.34% recomputed=-0.50% diff=-0.1600pp (recompute used stop=253952)
+    a-manifest 30-40 seed=100: recorded=-18.20% recomputed=-23.81% diff=-5.6095pp (recompute used stop=253952)
+    a-manifest 30-40 seed=123: recorded=+4.55% recomputed=+2.16% diff=-2.3878pp (recompute used stop=253952)
+    a-manifest 30-40 seed=200: recorded=+3.05% recomputed=+2.66% diff=-0.3904pp (recompute used stop=253952)
+    a-manifest 30-40 seed=300: recorded=-0.33% recomputed=-6.67% diff=-6.3367pp (recompute used stop=253952)
+    a-manifest 80-100 seed=42: recorded=+23.87% recomputed=+23.28% diff=-0.5941pp (recompute used stop=253952)
+    a-manifest 80-100 seed=100: recorded=+1.68% recomputed=+1.27% diff=-0.4102pp (recompute used stop=253952)
+    a-manifest 80-100 seed=123: recorded=+15.56% recomputed=+13.64% diff=-1.9236pp (recompute used stop=253952)
+    a-manifest 80-100 seed=200: recorded=-10.09% recomputed=-10.32% diff=-0.2252pp (recompute used stop=253952)
+    a-manifest 80-100 seed=300: recorded=+48.37% recomputed=+51.15% diff=+2.7821pp (recompute used stop=253952)

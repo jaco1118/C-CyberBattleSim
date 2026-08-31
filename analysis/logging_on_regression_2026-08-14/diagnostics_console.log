@@ -1,0 +1,15 @@
+  data_dict[key] = torch.as_tensor(value)
+seed=42 n_steps=2000
+  B1 dynamic_event_steps=53 by_type={'membership_leave': 53}
+  B2 steps_with_exactly_3_snapshot_calls=2000 steps_with_other_call_count=0
+  B2 h2_cached=620 h2_fresh=1380 h3_cached=53 h3_fresh=1947
+  data_dict[key] = torch.as_tensor(value)
+seed=100 n_steps=2000
+  B1 dynamic_event_steps=43 by_type={'membership_leave': 43}
+  B2 steps_with_exactly_3_snapshot_calls=2000 steps_with_other_call_count=0
+  B2 h2_cached=540 h2_fresh=1460 h3_cached=43 h3_fresh=1957
+  data_dict[key] = torch.as_tensor(value)
+seed=123 n_steps=2000
+  B1 dynamic_event_steps=57 by_type={'membership_leave': 57}
+  B2 steps_with_exactly_3_snapshot_calls=2000 steps_with_other_call_count=0
+  B2 h2_cached=662 h2_fresh=1338 h3_cached=57 h3_fresh=1943

@@ -40,7 +40,7 @@ dynamic_batch_interval: 150 # mean steps between low-rate Poisson "batch outage"
 dynamic_batch_size_mean: 1.0 # mean of the Poisson term added to the guaranteed 1 when a batch event fires
 dynamic_batch_max_fraction: 0.3 # cap on batch size as a fraction of the current eligible pool
 dynamic_degree_weighting: True # weight per-node removal probability down for high-degree/critical nodes
-patch_service_dynamic_enabled: False # legacy patch/service/mixed dynamic changes -- off by default, unrelated to node leave/join
+patch_service_dynamic_enabled: True # legacy patch/service/mixed dynamic changes -- Task D: now wired to the observation (update_node_dynamic hook), verified byte-identical when False and real drift when True
 
 # Dynamic environment (node join, mirrors the leave block above)
 dynamic_max_alive_nodes: # absolute ceiling: dynamic join never grows alive count above this; null -> derived purely from the fraction/joins-per-episode below
