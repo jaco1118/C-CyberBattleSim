@@ -10,8 +10,9 @@ Data (root_owned COUNT from score CSVs; was_root per removal from mech CSVs):
   80-100 static: f2eval_out/score_*_evalstatic ; fixed-abs(~18%): f2eval_out/score_*_evalmembership ; mech: f3_mech_out/mech_80-100
   80-100 fixed-relative(32.3%): f3_rel_out/score_*_evalmembership_matched ; mech: f3_rel_out/mech_80-100rel
 """
+import os
 import pandas as pd, numpy as np
-BASE = "/cs/student/project_msc/2025/sec/slchan/claude_home/.claude/jobs/0dfa230d/tmp/taskF1"
+BASE = os.path.join(os.path.dirname(__file__), "..", "..", "eval_out")
 SEEDS = [42, 100, 123, 200, 300]; RNG = np.random.default_rng(11); NB = 10000
 BANNER = ("PROVISIONAL (donor-pool confound, Task G pending): membership_join draws from a shared "
           "donor pool ~2.2x weaker at the large band; all join-related numbers inherit this caveat.")
