@@ -25,7 +25,7 @@ This project implements the advancements and extensions described in the paper <
 
 ## MSc dissertation artifacts
 
-This repository also includes the source and analysis code used for the MSc dissertation *Evaluating Robustness to Network Change in Autonomous Penetration Testing: Representation, Discovery, and Behaviour*. The examiner-facing guide, provenance records, exact input manifests, and relevant limitations are described in [README_ARTIFACTS.md](README_ARTIFACTS.md).
+This repository also includes the source and analysis code used for the MSc dissertation *Evaluating Robustness to Network Change in Autonomous Penetration Testing: Representation, Exploration, and Scale in a GNN–RL Agent*. The examiner-facing guide, provenance records, exact input manifests, and relevant limitations are described in [README_ARTIFACTS.md](README_ARTIFACTS.md).
 
 Bulk experimental artifacts:
 <https://liveuclac-my.sharepoint.com/:f:/g/personal/ucab347_ucl_ac_uk/IgAmnHotK-mlSZLrjn7cKj9yAWANGwV9ileVk1IjlyMB0AY?e=YP9Ix3>

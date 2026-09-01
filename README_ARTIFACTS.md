@@ -1,6 +1,6 @@
 # MSc dissertation artifacts
 
-These files accompany the dissertation *Evaluating Robustness to Network Change in Autonomous Penetration Testing: Representation, Discovery, and Behaviour* by Chan Sau Lai, submitted for the UCL MSc Information Security in 2026.
+These files accompany the dissertation *Evaluating Robustness to Network Change in Autonomous Penetration Testing: Representation, Exploration, and Scale in a GNN–RL Agent* by Chan Sau Lai, submitted for the UCL MSc Information Security in 2026.
 
 The university portal archive is the primary submission and includes a complete source snapshot. This GitHub repository is a supplementary way to inspect the same source and analysis code. Large experimental outputs are available separately from OneDrive:
 
