@@ -32,6 +32,8 @@ Bulk experimental artifacts:
 
 The external directory holds the selected large results, experimental topologies, final trained checkpoints, and checksum manifests. It is stored outside GitHub because of its size. The university portal submission remains self-contained and does not depend on this repository being available.
 
+## Project overview
+
 <p align="center">
 <img src="docs/source/images/home.png" alt="C-CyberBattleSim Overview" width="500"/>
 </p>

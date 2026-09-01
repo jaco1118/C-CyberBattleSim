@@ -1,6 +1,6 @@
 repository_relative_path	original_path_or_origin	source_commit	size_bytes	purpose
 EXTERNAL_BULK_ARTIFACTS.md	prepared from final dissertation evidence and portal documentation	not applicable	1420	examiner-facing artifact documentation
-README.md	README.md at audited source commit, with dissertation section added	d0153c6e0b21f96b6ddf5eaccfdc6f92b0f6ab82	14177	repository landing page and dissertation link
+README.md	README.md at audited source commit, with dissertation section added	d0153c6e0b21f96b6ddf5eaccfdc6f92b0f6ab82	14198	repository landing page and dissertation link
 README_ARTIFACTS.md	prepared from final dissertation evidence and portal documentation	not applicable	3806	examiner-facing artifact documentation
 artifact_data/rq3d_inputs/change/eventgraph_10-15/event_episode.jsonl	cyberbattle/agents/rq3d_data/change/eventgraph_10-15/event_episode.jsonl	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	272961	exact compact input for final RQ3d analysis
 artifact_data/rq3d_inputs/change/eventgraph_30-40/event_episode.jsonl	cyberbattle/agents/rq3d_data/change/eventgraph_30-40/event_episode.jsonl	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	285364	exact compact input for final RQ3d analysis
