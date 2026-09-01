@@ -23,6 +23,15 @@ of automated agents operating within simulated network environment scenarios for
 
 This project implements the advancements and extensions described in the paper <a href="https://ieeexplore.ieee.org/document/11352493">"Scalable and Generalizable RL Agents for Attack Path Discovery via Continuous Invariant Spaces"</a>.
 
+## MSc dissertation artifacts
+
+This repository also includes the source and analysis code used for the MSc dissertation *Evaluating Robustness to Network Change in Autonomous Penetration Testing: Representation, Discovery, and Behaviour*. The examiner-facing guide, provenance records, exact input manifests, and relevant limitations are described in [README_ARTIFACTS.md](README_ARTIFACTS.md).
+
+Bulk experimental artifacts:
+<https://liveuclac-my.sharepoint.com/:f:/g/personal/ucab347_ucl_ac_uk/IgAmnHotK-mlSZLrjn7cKj9yAWANGwV9ileVk1IjlyMB0AY?e=YP9Ix3>
+
+The external directory holds the selected large results, experimental topologies, final trained checkpoints, and checksum manifests. It is stored outside GitHub because of its size. The university portal submission remains self-contained and does not depend on this repository being available.
+
 <p align="center">
 <img src="docs/source/images/home.png" alt="C-CyberBattleSim Overview" width="500"/>
 </p>
