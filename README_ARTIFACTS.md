@@ -50,4 +50,4 @@ The evidence cards and files in `artifact_provenance/` give the commands, filter
 
 Some results should be interpreted with care. The main policies did not meet the final convergence rule; RQ1c has limited statistical power; the shared join donor pool is a confounding factor; and RQ2b is inconclusive for networks with 80--100 nodes. Stored step-3 actions do not provide a bit-for-bit replay of every run, so the relevant evidence supports distributional rather than exact trajectory reproduction. The final RQ3d result is the same-episode reranking analysis in `analysis/rq3d_ranking_overlap_2026-08-22/`.
 
-Further detail is available in `artifact_provenance/ARTIFACT_AUDIT.md` and `artifact_provenance/ARTIFACT_MISSING_OR_RISKY.md`.
+Further detail is available in the records under `evidence_cards/`. The exact RQ1c checkpoints and RQ3d inputs are listed in `artifact_provenance/RQ1C_FINAL_CHECKPOINT_ALLOWLIST.tsv` and `artifact_provenance/RQ3D_FINAL_INPUTS.tsv`.

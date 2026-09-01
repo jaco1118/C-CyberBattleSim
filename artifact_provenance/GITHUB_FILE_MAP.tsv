@@ -1,15 +1,12 @@
 repository_relative_path	original_path_or_origin	source_commit	size_bytes	purpose
-EXTERNAL_BULK_ARTIFACTS.md	prepared from final dissertation audit and portal documentation	not applicable	1420	examiner-facing artifact documentation
-README.md	README.md at audited source commit, with dissertation section added	8c2862ba2ba7424bb27e3ca67c5a9630a486bbde	14159	repository landing page and dissertation link
-README_ARTIFACTS.md	prepared from final dissertation audit and portal documentation	not applicable	3683	examiner-facing artifact documentation
+EXTERNAL_BULK_ARTIFACTS.md	prepared from final dissertation evidence and portal documentation	not applicable	1420	examiner-facing artifact documentation
+README.md	README.md at audited source commit, with dissertation section added	d0153c6e0b21f96b6ddf5eaccfdc6f92b0f6ab82	14159	repository landing page and dissertation link
+README_ARTIFACTS.md	prepared from final dissertation evidence and portal documentation	not applicable	3788	examiner-facing artifact documentation
 artifact_data/rq3d_inputs/change/eventgraph_10-15/event_episode.jsonl	cyberbattle/agents/rq3d_data/change/eventgraph_10-15/event_episode.jsonl	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	272961	exact compact input for final RQ3d analysis
 artifact_data/rq3d_inputs/change/eventgraph_30-40/event_episode.jsonl	cyberbattle/agents/rq3d_data/change/eventgraph_30-40/event_episode.jsonl	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	285364	exact compact input for final RQ3d analysis
 artifact_data/rq3d_inputs/change/eventgraph_80-100/event_episode.jsonl	cyberbattle/agents/rq3d_data/change/eventgraph_80-100/event_episode.jsonl	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	289274	exact compact input for final RQ3d analysis
 artifact_data/rq3d_inputs/static/eventgraph_10-15/event_episode.jsonl	cyberbattle/agents/rq3d_data/static/eventgraph_10-15/event_episode.jsonl	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	174411	exact compact input for final RQ3d analysis
 artifact_data/rq3d_inputs/static/eventgraph_30-40/event_episode.jsonl	cyberbattle/agents/rq3d_data/static/eventgraph_30-40/event_episode.jsonl	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	183506	exact compact input for final RQ3d analysis
 artifact_data/rq3d_inputs/static/eventgraph_80-100/event_episode.jsonl	cyberbattle/agents/rq3d_data/static/eventgraph_80-100/event_episode.jsonl	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	183845	exact compact input for final RQ3d analysis
-artifact_provenance/ARTIFACT_AUDIT.md	ARTIFACT_AUDIT.md	prepared from final dissertation evidence	11889	source, input, and reproducibility provenance
-artifact_provenance/ARTIFACT_MISSING_OR_RISKY.md	ARTIFACT_MISSING_OR_RISKY.md	prepared from final dissertation evidence	4194	source, input, and reproducibility provenance
-artifact_provenance/RQ1C_FINAL_CHECKPOINT_ALLOWLIST.tsv	RQ1C_FINAL_CHECKPOINT_ALLOWLIST.tsv	prepared from final dissertation evidence	13128	source, input, and reproducibility provenance
-artifact_provenance/RQ3D_FINAL_INPUTS.tsv	RQ3D_FINAL_INPUTS.tsv	prepared from final dissertation evidence	1604	source, input, and reproducibility provenance
-artifact_provenance/SUBMISSION_SOURCE_STATE.md	SUBMISSION_SOURCE_STATE.md	prepared from final dissertation evidence	6145	source, input, and reproducibility provenance
+artifact_provenance/RQ1C_FINAL_CHECKPOINT_ALLOWLIST.tsv	final RQ1c checkpoint audit	not applicable	13128	exact final RQ1c checkpoint and VecNormalize allow-list
+artifact_provenance/RQ3D_FINAL_INPUTS.tsv	final RQ3d input audit	3d8c9aa84497fb20c85bbe30452a5cfdd8469421	1604	exact final RQ3d input manifest
